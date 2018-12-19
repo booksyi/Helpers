@@ -397,7 +397,7 @@ namespace HelpersForCore
                     }
                 }
             }
-            return System.ComponentModel.TypeDescriptor.GetConverter(type).ConvertTo(value, type);
+            return Convert.ChangeType(value, type);
         }
         /// <summary>
         /// 設定物件的屬性值
