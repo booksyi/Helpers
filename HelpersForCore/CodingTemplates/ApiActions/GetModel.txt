@@ -1,0 +1,39 @@
+﻿using HelpersForCore;
+using MediatR;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using {{ProjectName}}.Models;
+
+namespace {{ProjectName}}.Controllers.{{Plural}}.Actions
+{
+    public class Get{{Singular}}
+    {
+        public class Request : IRequest<Response>
+        {
+        }
+        
+        public class Response : ResponseBase<{{Singular}}>
+        {
+            public Response({{Singular}} result) : base(result)
+            {
+            }
+        }
+        
+        public class Handler : IRequestHandler<Request, Response>
+        {
+            public Handler()
+            {
+            }
+			
+            public async Task<Response> Handle(Request request, CancellationToken token)
+            {
+                {{Singular}} {{singular}} = new {{Singular}}();
+                // TODO: Get Data
+                return new Response({{singular}});
+            }
+        }
+    }
+}

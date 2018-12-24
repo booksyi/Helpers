@@ -1,0 +1,31 @@
+﻿using HelpersForCore;
+using MediatR;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using {{ProjectName}}.Models;
+
+namespace {{ProjectName}}.Controllers.{{Plural}}.Actions
+{
+    public class Delete{{Singular}}
+    {
+        public class Request : IRequest<ResponseBase<bool>>
+        {
+        }
+        
+        public class Handler : IRequestHandler<Request, ResponseBase<bool>>
+        {
+            public Handler()
+            {
+            }
+			
+            public async Task<IResponse<bool>> Handle(Request request, CancellationToken token)
+            {
+                // TODO: Delete Data
+                return new ResponseBase<bool>(true);
+            }
+        }
+    }
+}

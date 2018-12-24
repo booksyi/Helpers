@@ -621,6 +621,21 @@ namespace HelpersForCore
         }
 
         /// <summary>
+        /// 將字串的第一個字轉成大寫
+        /// </summary>
+        public static string UpperFirst(this string sender)
+        {
+            return $"{sender.ToUpper().Substring(0, 1)}{sender.Substring(1)}";
+        }
+        /// <summary>
+        /// 將字串的第一個字轉成小寫
+        /// </summary>
+        public static string LowerFirst(this string sender)
+        {
+            return $"{sender.ToLower().Substring(0, 1)}{sender.Substring(1)}";
+        }
+
+        /// <summary>
         /// 如果字串第一行是空白的則移除
         /// </summary>
         public static string CutEmptyHead(this string sender)
