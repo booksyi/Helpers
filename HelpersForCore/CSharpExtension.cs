@@ -505,6 +505,18 @@ namespace HelpersForCore
         }
 
         /// <summary>
+        /// 在條件成立下為 Dictionary 加入新的鍵值對
+        /// </summary>
+        public static Dictionary<T1, T2> AddIf<T1, T2>(this Dictionary<T1, T2> sender, bool filter, T1 key, T2 value)
+        {
+            if (filter)
+            {
+                sender.Add(key, value);
+            }
+            return sender;
+        }
+
+        /// <summary>
         /// 從字串中依照指定格式解析出參數的字典
         /// (重複的參數名稱只取第一個參數的值)
         /// </summary>

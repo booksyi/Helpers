@@ -560,7 +560,25 @@ namespace HelpersForCore
         {
             foreach (var apply in applyValues)
             {
-                if (apply.Value.IndexOf("\n") >= 0)
+                if (string.IsNullOrWhiteSpace(apply.Value))
+                {
+                    int paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
+                    int lineIndex = template.Substring(0, paramIndex).LastIndexOf("\n");
+                    int lineLastIndex = template.IndexOf("\n", paramIndex);
+                    string line = $"{template.Substring(lineIndex + 1, paramIndex - lineIndex - 1)}{template.Substring(paramIndex + apply.Key.Length + 4, lineLastIndex - (paramIndex + apply.Key.Length + 4))}";
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        if (lineIndex >= 0)
+                        {
+                            template = $"{template.Substring(0, lineIndex)}{template.Substring(lineLastIndex)}";
+                        }
+                        else
+                        {
+                            template = $"{template.Substring(lineLastIndex + 1)}";
+                        }
+                    }
+                }
+                else if (apply.Value.IndexOf("\n") >= 0)
                 {
                     int paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
                     while (paramIndex >= 0)

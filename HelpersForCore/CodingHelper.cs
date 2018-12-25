@@ -9,139 +9,6 @@ namespace HelpersForCore
 {
     public class CodingHelper
     {
-        const string TemplatesPath = @"D:\Workspace\Helpers\HelpersForCore\CodingTemplates";
-
-        public static async Task<string> GenerateCSharpApiControllerAsync(DbTableSchema tableSchema, string projectName)
-        {
-            var pluralizer = new Pluralize.NET.Core.Pluralizer();
-            string singular = pluralizer.Singularize(tableSchema.TableName).LowerFirst();
-            string plural = pluralizer.Pluralize(tableSchema.TableName).LowerFirst();
-            string template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiController.txt"));
-            return CSharpHelper.Generate(template, new Dictionary<string, string>()
-            {
-                { "ProjectName", projectName },
-                { "Singular", singular.UpperFirst() },
-                { "singular", singular },
-                { "Plural", plural.UpperFirst() },
-                { "plural", plural },
-            });
-        }
-
-        public static async Task<string> GenerateCSharpApiActionAsync(DbTableSchema tableSchema, string projectName, ApiActionType type)
-        {
-            var pluralizer = new Pluralize.NET.Core.Pluralizer();
-            string singular = pluralizer.Singularize(tableSchema.TableName).LowerFirst();
-            string plural = pluralizer.Pluralize(tableSchema.TableName).LowerFirst();
-            string template = null;
-            switch (type)
-            {
-                case ApiActionType.GetModels:
-                    template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiActions\GetModels.txt"));
-                    break;
-                case ApiActionType.GetModel:
-                    template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiActions\GetModel.txt"));
-                    break;
-                case ApiActionType.CreateModel:
-                    template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiActions\CreateModel.txt"));
-                    break;
-                case ApiActionType.UpdateModel:
-                    template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiActions\UpdateModel.txt"));
-                    break;
-                case ApiActionType.DeleteModel:
-                    template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"ApiActions\DeleteModel.txt"));
-                    break;
-            }
-            return CSharpHelper.Generate(template, new Dictionary<string, string>()
-            {
-                { "ProjectName", projectName },
-                { "Singular", singular.UpperFirst() },
-                { "singular", singular },
-                { "Plural", plural.UpperFirst() },
-                { "plural", plural },
-            });
-        }
-
-        public static async Task<string> GenerateCSharpModelAsync(DbTableSchema tableSchema, string projectName, bool useSummary = true, bool useColumnAttr = false)
-        {
-            var pluralizer = new Pluralize.NET.Core.Pluralizer();
-            string singular = pluralizer.Singularize(tableSchema.TableName).LowerFirst();
-            string plural = pluralizer.Pluralize(tableSchema.TableName).LowerFirst();
-            string template = await File.ReadAllTextAsync(Path.Combine(TemplatesPath, @"Model.txt"));
-            return CSharpHelper.Generate(template, new Dictionary<string, string>()
-            {
-                { "ProjectName", projectName },
-                { "Model", GenerateModelCode(tableSchema, useSummary, useColumnAttr) },
-            });
-        }
-
-        /// <summary>
-        /// 從 DB 取得 Table 的欄位資訊並生成 cs 的 Class
-        /// </summary>
-        public static string GenerateModelCode(DbTableSchema tableSchema, bool useSummary = true, bool useColumnAttr = false)
-        {
-            List<string> props = new List<string>();
-            foreach (var field in tableSchema.Fields)
-            {
-                string prop = "";
-                if (useSummary && !string.IsNullOrWhiteSpace(field.Description))
-                {
-                    prop = $@"
-                        {prop.ReplaceEndline(@"
-                        ")}
-                        /// <summary>
-                        /// {field.Description.ReplaceEndline(@"
-                        /// ")}
-                        /// </summary>".CutEmptyHead().DecreaseIndentAllLines();
-                }
-                if (useColumnAttr)
-                {
-                    if (field.DbType.In(
-                        "char", "nchar", "ntext", "nvarchar", "text", "varchar", "xml"))
-                    {
-                        if (field.Nullable == 0)
-                        {
-                            prop = $@"
-                                {prop.ReplaceEndline(@"
-                                ")}
-                                [Required]".CutEmptyHead().DecreaseIndentAllLines();
-                        }
-                        prop = $@"
-                            {prop.ReplaceEndline(@"
-                            ")}
-                            [Column(""{field.Name}"")]".CutEmptyHead().DecreaseIndentAllLines();
-                        if (field.Length > 0)
-                        {
-                            prop = $@"
-                                {prop.ReplaceEndline(@"
-                                ")}
-                                [StringLength({field.Length})]".CutEmptyHead().DecreaseIndentAllLines();
-                        }
-                    }
-                    else
-                    {
-                        prop = $@"
-                            {prop.ReplaceEndline(@"
-                            ")}
-                            [Column(""{field.Name}"", TypeName = ""{field.DbFullType}"")]".CutEmptyHead().DecreaseIndentAllLines();
-                    }
-                }
-                prop = $@"
-                    {prop.ReplaceEndline(@"
-                    ")}
-                    public {field.CsType} {field.Name} {{ get; set; }}".CutEmptyHead().DecreaseIndentAllLines();
-                props.Add(prop);
-            }
-
-            return $@"
-                [Table(""{tableSchema.TableName}"")]
-                public class {tableSchema.TableName}
-                {{
-                    {string.Join(@"
-                    ", props.Select(x => x.ReplaceEndline(@"
-                    "))).CutEmptyHead().TrimStart()}
-                }}".CutEmptyHead().DecreaseIndentAllLines();
-        }
-
         /// <summary>
         /// 取得資料庫的所有資料表名稱
         /// </summary>
@@ -194,8 +61,9 @@ namespace HelpersForCore
                 .Rows.ToModels<DbTableSchema.Field>();
             foreach (DbTableSchema.Field field in schema.Fields)
             {
-                field.DbFullType = GetDbFullTypeName(field.DbType, field.Length, field.Prec, field.Scale);
-                field.CsType = GetCsTypeName(field.DbType, field.Nullable == 1);
+                field.DbFullType = GetDbFullTypeName(field);
+                field.CsAttributes = GetCsAttributeCodes(field);
+                field.CsType = GetCsTypeName(field);
             }
             return schema;
         }
@@ -203,9 +71,9 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB 欄位包含長度的類型名稱
         /// </summary>
-        public static string GetDbFullTypeName(string dbTypeName, int length, int prec, int scale)
+        public static string GetDbFullTypeName(DbTableSchema.Field field)
         {
-            switch (dbTypeName)
+            switch (field.DbType)
             {
                 case "binary":
                 case "char":
@@ -216,21 +84,44 @@ namespace HelpersForCore
                 case "time":
                 case "varbinary":
                 case "varchar":
-                    return $"{dbTypeName}({(length == -1 ? "max" : Convert.ToString(length))})";
+                    return $"{field.DbType}({(field.Length == -1 ? "max" : Convert.ToString(field.Length))})";
                 case "decimal":
                 case "numeric":
-                    return $"{dbTypeName}({prec}, {scale})";
+                    return $"{field.DbType}({field.Prec}, {field.Scale})";
                 default:
-                    return dbTypeName;
+                    return field.DbType;
             }
+        }
+
+        public static IEnumerable<string> GetCsAttributeCodes(DbTableSchema.Field field)
+        {
+            List<string> attributes = new List<string>();
+            if (field.DbType.In("char", "nchar", "ntext", "nvarchar", "text", "varchar", "xml"))
+            {
+                if (field.Nullable == 0)
+                {
+                    attributes.Add("[Required]");
+                }
+                attributes.Add($@"[Column(""{field.Name}"")]");
+                if (field.Length > 0)
+                {
+                    attributes.Add($"[StringLength({field.Length})]");
+                }
+            }
+            else
+            {
+                attributes.Add($@"[Column(""{field.Name}"", TypeName = ""{field.DbFullType}"")]");
+            }
+            return attributes;
         }
 
         /// <summary>
         /// 取得對應 DB 類別的 CSharp 類別名稱
         /// </summary>
-        public static string GetCsTypeName(string dbTypeName, bool nullable = false)
+        public static string GetCsTypeName(DbTableSchema.Field field)
         {
-            switch (dbTypeName)
+            bool nullable = field.Nullable == 1;
+            switch (field.DbType)
             {
                 case "bigint":
                     return $"long{(nullable ? "?" : "")}";
