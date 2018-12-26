@@ -1,43 +1,42 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace HelpersForCore
 {
-    public class ResponseBase<T>
+    public class SingleResponse<T>
     {
-        public int Code { get; set; }
+        public int Code { get; set; } = StatusCodes.Status200OK;
         public T Result { get; set; }
         public string Error { get; set; }
         public string Description { get; set; }
 
-        public bool HasError => string.IsNullOrWhiteSpace(Error) == false;
+        public bool HasError => Error != null;
         public ObjectResult FailedResult => new ObjectResult(Error)
         {
             StatusCode = Code
         };
 
-        public ResponseBase() { }
-        public ResponseBase(T result)
+        public SingleResponse() { }
+        public SingleResponse(T result)
         {
             Result = result;
         }
 
-        public void WithError(int code, string error, string description = null)
+        public void WithError(int code, string error)
         {
             if (string.IsNullOrWhiteSpace(error))
             {
-                error = "可預期但沒有描述的錯誤。(應在程式開發時加以描述)";
+                error = "可預期但沒有描述的錯誤。";
             }
             Code = code;
             Error = error;
-            Description = description;
         }
     }
 
-    public class MultiResponse<T> : ResponseBase<IEnumerable<T>>
+    public class MultiResponse<T> : SingleResponse<IEnumerable<T>>
     {
         public bool IsPaged { get; set; }
         public int PageNumber { get; set; }

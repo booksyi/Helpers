@@ -553,53 +553,271 @@ namespace HelpersForCore
             return (stop - start).TotalMilliseconds;
         }
 
+        public static string Generate(string template, Dictionary<string, IEnumerable<string>> applyValues)
+        {
+            const string paramLeft = "{{{";
+            const string paramRight = "}}}";
+            const string assignLeft = "(";
+            const string assignRight = ")";
+            const string assignParamAs = ":";
+            const string assignParamSeparator = ",";
+            const string eachSeparator = "|";
+            Dictionary<string, string> separatorSynonyms = new Dictionary<string, string>
+            {
+                { "@@Space", " " },
+                { "@@Endline", "\n" },
+                { "@@Tab", "\t" }
+            };
+
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return null;
+            }
+
+            int paramStartIndex = template.IndexOf(paramLeft);
+            while (paramStartIndex >= 0)
+            {
+                paramStartIndex = paramStartIndex + paramLeft.Length;
+                int paramEndIndex = template.IndexOf(paramRight, paramStartIndex) - 1;
+                int lineStartIndex = template.Substring(0, paramStartIndex).LastIndexOf("\n") + 1;
+                int lineEndIndex = Using(template.IndexOf("\n", lineStartIndex + 1), x => x >= 0 ? x : template.Length) - 1;
+                string prefix = template.Substring(lineStartIndex, paramStartIndex - paramLeft.Length - lineStartIndex + 1);
+                string suffix = template.Substring(paramEndIndex + paramRight.Length + 1, lineEndIndex - (paramEndIndex + paramRight.Length));
+                string paramKey = null, paramValue = "";
+                if (paramStartIndex < paramEndIndex && paramEndIndex < lineEndIndex)
+                {
+                    int assignStartIndex = Using(template.Substring(0, lineEndIndex + 1).IndexOf(assignLeft, paramStartIndex), x => x >= 0 ? x + assignLeft.Length : -1);
+                    int assignEndIndex = Using(template.Substring(0, lineEndIndex + 1).IndexOf(assignRight, assignStartIndex), x => x >= 0 ? x - assignRight.Length : -1);
+                    int separatorIndex = template.Substring(0, lineEndIndex + 1).IndexOf(eachSeparator, paramStartIndex);
+                    string param = template.Substring(paramStartIndex, paramEndIndex - paramStartIndex + 1);
+                    #region Get Separator
+                    string separator = "";
+                    if (param.Contains(eachSeparator))
+                    {
+                        separator = template.Substring(separatorIndex + 1, paramEndIndex - separatorIndex).Trim();
+                        foreach (var synonym in separatorSynonyms)
+                        {
+                            separator = separator.Replace(synonym.Key, synonym.Value);
+                        }
+                    }
+                    #endregion
+                    #region Get Key and Value
+                    if (param.Contains(assignLeft) && param.Contains(assignRight))
+                    {
+                        paramKey = template.Substring(paramStartIndex, assignStartIndex - paramStartIndex - assignLeft.Length).Trim();
+                        if ((string.IsNullOrWhiteSpace(paramKey) == false)
+                            && applyValues.ContainsKey(paramKey)
+                            && applyValues[paramKey] != null
+                            && applyValues[paramKey].Any())
+                        {
+                            string assign = template.Substring(assignStartIndex, assignEndIndex - assignStartIndex + 1);
+                            string subTemplate = string.Join(separator, applyValues[paramKey]);
+                            Dictionary<string, IEnumerable<string>> subApplyValues = assign
+                                .Split(assignParamSeparator)
+                                .Select(x =>
+                                {
+                                    string key = null, valueKey = null;
+                                    int assignParamAsIndex = x.IndexOf(assignParamAs);
+                                    if (x.Contains(assignParamAs))
+                                    {
+                                        key = x.Substring(0, assignParamAsIndex).Trim();
+                                        valueKey = x.Substring(assignParamAsIndex + assignParamAs.Length).Trim();
+                                    }
+                                    else
+                                    {
+                                        key = valueKey = x.Trim();
+                                    }
+                                    return (Key: key, Value: applyValues.ContainsKey(valueKey) ? applyValues[valueKey] : null);
+                                })
+                                .Where(x => string.IsNullOrWhiteSpace(x.Key) == false)
+                                .ToDictionary(x => x.Key, x => x.Value);
+                            paramValue = Generate(subTemplate, subApplyValues);
+                        }
+                    }
+                    else if (param.Contains(eachSeparator))
+                    {
+                        paramKey = template.Substring(paramStartIndex, separatorIndex - paramStartIndex).Trim();
+                        if ((string.IsNullOrWhiteSpace(paramKey) == false)
+                            && applyValues.ContainsKey(paramKey)
+                            && applyValues[paramKey] != null
+                            && applyValues[paramKey].Any())
+                        {
+                            paramValue = string.Join(separator, applyValues[paramKey]);
+                        }
+                    }
+                    else
+                    {
+                        paramKey = param.Trim();
+                        if ((string.IsNullOrWhiteSpace(paramKey) == false)
+                            && applyValues.ContainsKey(paramKey)
+                            && applyValues[paramKey] != null
+                            && applyValues[paramKey].Any())
+                        {
+                            paramValue = string.Join(separator, applyValues[paramKey]);
+                        }
+                    }
+                    #endregion
+                    #region Apply Value
+                    if (string.IsNullOrWhiteSpace(paramKey) == false)
+                    {
+                        if (string.IsNullOrWhiteSpace(prefix))
+                        {
+                            paramValue = paramValue.Replace("\n", $"\n{prefix}");
+                        }
+                        if (string.IsNullOrWhiteSpace(paramValue)
+                            && string.IsNullOrWhiteSpace(prefix)
+                            && string.IsNullOrWhiteSpace(suffix))
+                        {
+                            if (lineEndIndex + 2 < template.Length)
+                            {
+                                template = $"{template.Substring(0, Math.Max(lineStartIndex - 1, 0))}{template.Substring(lineEndIndex + 2)}";
+                            }
+                            else
+                            {
+                                template = $"{template.Substring(0, Math.Max(lineStartIndex - 1, 0))}";
+                            }
+                        }
+                        else
+                        {
+                            template = $"{template.Substring(0, paramStartIndex - paramLeft.Length)}{paramValue}{template.Substring(paramEndIndex + paramRight.Length + 1)}";
+                        }
+                    }
+                    #endregion
+                }
+                paramStartIndex = template.IndexOf(paramLeft, paramStartIndex + (paramKey != null ? paramKey.Length : 0));
+            }
+            return template;
+        }
+
         /// <summary>
         /// 以 Dictionary 來取代樣板中 Key 對應的參數
         /// </summary>
-        public static string Generate(string template, Dictionary<string, string> applyValues)
+        public static string OldGenerate(string template, Dictionary<string, string> applyValues)
         {
             foreach (var apply in applyValues)
             {
+                int paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
                 if (string.IsNullOrWhiteSpace(apply.Value))
                 {
-                    int paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
-                    int lineIndex = template.Substring(0, paramIndex).LastIndexOf("\n");
-                    int lineLastIndex = template.IndexOf("\n", paramIndex);
-                    string line = $"{template.Substring(lineIndex + 1, paramIndex - lineIndex - 1)}{template.Substring(paramIndex + apply.Key.Length + 4, lineLastIndex - (paramIndex + apply.Key.Length + 4))}";
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        if (lineIndex >= 0)
-                        {
-                            template = $"{template.Substring(0, lineIndex)}{template.Substring(lineLastIndex)}";
-                        }
-                        else
-                        {
-                            template = $"{template.Substring(lineLastIndex + 1)}";
-                        }
-                    }
-                }
-                else if (apply.Value.IndexOf("\n") >= 0)
-                {
-                    int paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
+                    #region 如果是空值，取代完移除空白行
                     while (paramIndex >= 0)
                     {
                         int lineIndex = template.Substring(0, paramIndex).LastIndexOf("\n");
-                        string prefix = template.Substring(lineIndex + 1, paramIndex - (lineIndex + 1));
-                        if (string.IsNullOrWhiteSpace(prefix))
+                        int lineEndIndex = template.IndexOf("\n", paramIndex);
+                        string line = $"{template.Substring(lineIndex + 1, paramIndex - lineIndex - 1)}{template.Substring(paramIndex + apply.Key.Length + 4, lineEndIndex - (paramIndex + apply.Key.Length + 4))}";
+                        if (string.IsNullOrWhiteSpace(line))
                         {
-                            string prefixValue = apply.Value.Replace("\n", $"\n{prefix}");
-                            template = $"{template.Substring(0, paramIndex)}{prefixValue}{template.Substring(paramIndex + apply.Key.Length + 4)}";
-                        }
-                        else
-                        {
-                            template = $"{template.Substring(0, paramIndex)}{apply.Value}{template.Substring(paramIndex + apply.Key.Length + 4)}";
+                            if (lineIndex >= 0)
+                            {
+                                template = $"{template.Substring(0, lineIndex)}{template.Substring(lineEndIndex)}";
+                            }
+                            else
+                            {
+                                template = $"{template.Substring(lineEndIndex + 1)}";
+                            }
                         }
                         paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
                     }
+                    #endregion
                 }
                 else
                 {
-                    template = template.Replace($"{{{{{apply.Key}}}}}", apply.Value);
+                    #region 很正常的取代值
+                    while (paramIndex >= 0)
+                    {
+                        string replaceValue = apply.Value;
+                        if (apply.Value.IndexOf("\n") >= 0)
+                        {
+                            int lineIndex = template.Substring(0, paramIndex).LastIndexOf("\n");
+                            string prefix = template.Substring(lineIndex + 1, paramIndex - (lineIndex + 1));
+                            if (string.IsNullOrWhiteSpace(prefix))
+                            {
+                                replaceValue = apply.Value.Replace("\n", $"\n{prefix}");
+                            }
+                        }
+                        template = $"{template.Substring(0, paramIndex)}{replaceValue}{template.Substring(paramIndex + apply.Key.Length + 4)}";
+                        paramIndex = template.IndexOf($"{{{{{apply.Key}}}}}");
+                    }
+                    #endregion
+                }
+
+                Dictionary<string, string> flattenValues = new Dictionary<string, string>();
+                #region 巢狀取代值
+                paramIndex = template.IndexOf($"{{{{{apply.Key}");
+                while (paramIndex >= 0)
+                {
+                    int subParamIndex = template.IndexOf(">>>", paramIndex + apply.Key.Length + 2);
+                    int subParamEndIndex = template.IndexOf(">>>", subParamIndex + 3);
+                    int paramEndIndex = template.IndexOf($"}}}}", subParamEndIndex + 3);
+                    int nextParamIndex = template.IndexOf($"{{{{", paramIndex + apply.Key.Length + 2);
+                    int lineEndIndex = template.IndexOf("\n", paramIndex + apply.Key.Length + 2);
+                    if (paramIndex < subParamIndex
+                        && subParamIndex < subParamEndIndex
+                        && subParamEndIndex < paramEndIndex
+                        && (paramEndIndex < nextParamIndex || nextParamIndex == -1)
+                        && (paramEndIndex < lineEndIndex || lineEndIndex == -1)
+                        && template.Substring(paramIndex + apply.Key.Length + 2).TrimStart().StartsWith(">>>"))
+                    {
+                        string flattenKey = $"{DateTime.Now:yyyyMMddHHmmssfff}{Guid.NewGuid().ToString("N")}";
+                        string flattenValue = null;
+                        if (string.IsNullOrWhiteSpace(apply.Value) == false)
+                        {
+                            flattenValue = OldGenerate(
+                                apply.Value,
+                                template
+                                    .Substring(subParamIndex + 3, subParamEndIndex - (subParamIndex + 3))
+                                    .Split(',')
+                                    .Select(x =>
+                                    {
+                                        string key = null, valueKey = null, value = null;
+                                        int separatorIndex = x.IndexOf(":");
+                                        if (x.Contains(":"))
+                                        {
+                                            key = x.Substring(0, separatorIndex).Trim();
+                                            valueKey = x.Substring(separatorIndex + 1).Trim();
+                                        }
+                                        else
+                                        {
+                                            key = valueKey = x.Trim();
+                                        }
+                                        value = applyValues.ContainsKey(valueKey) ? applyValues[valueKey] : null;
+                                        return (Key: key, Value: value);
+                                    }).ToDictionary(x => x.Key, x => x.Value));
+                        }
+                        template = $"{template.Substring(0, paramIndex)}{{{{{flattenKey}}}}}{template.Substring(paramEndIndex + 2)}";
+                        flattenValues.Add(flattenKey, flattenValue);
+                    }
+                    paramIndex = template.IndexOf($"{{{{{apply.Key}", paramIndex + apply.Key.Length + 2);
+                }
+                #endregion
+                #region 捨棄巢狀直接取代
+                paramIndex = template.IndexOf($"{apply.Key}}}}}");
+                while (paramIndex >= 0)
+                {
+                    int paramEndIndex = paramIndex;
+                    int subParamEndIndex = template.Substring(0, paramEndIndex).LastIndexOf(">>>");
+                    paramIndex = template.Substring(0, subParamEndIndex).LastIndexOf($"{{{{");
+                    int lastParamIndex = template.Substring(0, paramIndex).LastIndexOf($"}}}}");
+                    int lineEndIndex = template.Substring(0, paramIndex).LastIndexOf("\n");
+                    if (paramIndex < subParamEndIndex
+                        && subParamEndIndex < paramEndIndex
+                        && (lastParamIndex < paramIndex || lastParamIndex == -1)
+                        && (lineEndIndex < paramIndex || lineEndIndex == -1)
+                        && template.Substring(paramIndex + apply.Key.Length + 2).TrimStart().StartsWith(">>>"))
+                    {
+                        template = $"{template.Substring(0, paramIndex)}{{{{{apply.Key}}}}}{template.Substring(paramEndIndex + apply.Key.Length + 2)}";
+                        if (flattenValues.ContainsKey(apply.Key) == false)
+                        {
+                            flattenValues.Add(apply.Key, apply.Value);
+                        }
+                    }
+                    paramIndex = template.IndexOf($"{apply.Key}}}}}", paramIndex + apply.Key.Length + 2);
+                }
+
+                #endregion
+                if (flattenValues.Any())
+                {
+                    template = OldGenerate(template, flattenValues);
                 }
             }
             return template;
