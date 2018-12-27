@@ -9,6 +9,117 @@ namespace HelpersForCore
 {
     public class CodingHelper
     {
+        public static string Generate(GenerateNode root)
+        {
+            const string paramLeft = "{{";
+            const string paramRight = "}}";
+            const string eachSeparator = "|";
+            Dictionary<string, string> separatorSynonyms = new Dictionary<string, string>
+            {
+                { "@@Space", " " },
+                { "@@Endline", "\r\n" },
+                { "@@Tab", "\t" }
+            };
+
+            if (string.IsNullOrWhiteSpace(root.Text))
+            {
+                return null;
+            }
+
+            string result = root.Text;
+
+            int searchIndex = 0;
+            int paramStartIndex = result.IndexOf(paramLeft);
+            while (paramStartIndex >= 0)
+            {
+                paramStartIndex = paramStartIndex + paramLeft.Length;
+                int paramEndIndex = result.IndexOf(paramRight, paramStartIndex) - 1;
+                int lineStartIndex = result.Substring(0, paramStartIndex).LastIndexOf("\n") + 1;
+                int lineEndIndex = CSharpHelper.Using(result.IndexOf("\n", lineStartIndex + 1), x => x >= 0 ? x : result.Length) - 1;
+                string prefix = result.Substring(lineStartIndex, paramStartIndex - paramLeft.Length - lineStartIndex);
+                string suffix = result.Substring(paramEndIndex + paramRight.Length + 1, lineEndIndex - (paramEndIndex + paramRight.Length));
+                string paramKey = null, paramValue = "";
+                if (paramStartIndex < paramEndIndex && paramEndIndex < lineEndIndex)
+                {
+                    int separatorIndex = result.Substring(0, lineEndIndex + 1).IndexOf(eachSeparator, paramStartIndex);
+                    string param = result.Substring(paramStartIndex, paramEndIndex - paramStartIndex + 1);
+                    #region Get Separator
+                    string separator = "";
+                    if (param.Contains(eachSeparator))
+                    {
+                        separator = result.Substring(separatorIndex + 1, paramEndIndex - separatorIndex).Trim();
+                        foreach (var synonym in separatorSynonyms)
+                        {
+                            separator = separator.Replace(synonym.Key, synonym.Value);
+                        }
+                    }
+                    #endregion
+                    #region Get Key and Value
+                    if (param.Contains(eachSeparator))
+                    {
+                        paramKey = result.Substring(paramStartIndex, separatorIndex - paramStartIndex).Trim();
+                    }
+                    else
+                    {
+                        paramKey = param.Trim();
+                    }
+                    if ((string.IsNullOrWhiteSpace(paramKey) == false)
+                        && root.Children.Any(x => x.Name == paramKey))
+                    {
+                        paramValue = string.Join(
+                            separator,
+                            root.Children
+                                .Where(x => x.Name == paramKey)
+                                .Select(node =>
+                                {
+                                    if (node.Children.Any())
+                                    {
+                                        return Generate(node);
+                                    }
+                                    return node.Text;
+                                }));
+                    }
+                    #endregion
+                    #region Apply Value
+                    if (string.IsNullOrWhiteSpace(paramKey) == false)
+                    {
+                        if (string.IsNullOrWhiteSpace(prefix))
+                        {
+                            paramValue = paramValue.Replace("\n", $"\n{prefix}");
+                        }
+                        if (string.IsNullOrWhiteSpace(paramValue)
+                            && string.IsNullOrWhiteSpace(prefix)
+                            && string.IsNullOrWhiteSpace(suffix))
+                        {
+                            if (lineEndIndex + 2 < result.Length)
+                            {
+                                result = $"{result.Substring(0, Math.Max(lineStartIndex - 1, 0))}{result.Substring(lineEndIndex + 2)}";
+                                searchIndex = lineStartIndex;
+                            }
+                            else
+                            {
+                                result = $"{result.Substring(0, Math.Max(lineStartIndex - 1, 0))}";
+                                searchIndex = -1;
+                            }
+                        }
+                        else
+                        {
+                            result = $"{result.Substring(0, paramStartIndex - paramLeft.Length)}{paramValue}{result.Substring(paramEndIndex + paramRight.Length + 1)}";
+                            searchIndex = paramStartIndex - paramLeft.Length + paramValue.Length;
+                        }
+                    }
+                    else
+                    {
+                        searchIndex = paramStartIndex + param.Length;
+                    }
+                    #endregion
+                }
+                paramStartIndex = searchIndex >= 0 ? result.IndexOf(paramLeft, searchIndex) : -1;
+            }
+            return result;
+        }
+
+
         /// <summary>
         /// 取得資料庫的所有資料表名稱
         /// </summary>

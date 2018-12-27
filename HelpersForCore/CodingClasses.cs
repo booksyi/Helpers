@@ -43,11 +43,22 @@ namespace HelpersForCore
         }
     }
 
-    public class GenerateValue
+    public class GenerateNode
     {
-        public string Key { get; set; }
-        public IEnumerable<string> Values { get; set; }
+        public string Name { get; private set; }
+        public string Text { get; set; }
+        public List<GenerateNode> Children { get; private set; }
 
+        public GenerateNode(string name, string text)
+        {
+            Name = name;
+            Text = text;
+            Children = new List<GenerateNode>();
+        }
 
+        public void Rename(string newName)
+        {
+            Name = newName;
+        }
     }
 }
