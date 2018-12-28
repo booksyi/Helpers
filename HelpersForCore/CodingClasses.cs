@@ -47,18 +47,23 @@ namespace HelpersForCore
     {
         public string Name { get; private set; }
         public string Text { get; set; }
-        public List<GenerateNode> Children { get; private set; }
+        public List<GenerateNode> Children { get; private set; } = new List<GenerateNode>();
+
+        public GenerateNode(string text)
+        {
+            Text = text;
+        }
 
         public GenerateNode(string name, string text)
         {
             Name = name;
             Text = text;
-            Children = new List<GenerateNode>();
         }
 
-        public void Rename(string newName)
+        public GenerateNode Rename(string newName)
         {
             Name = newName;
+            return this;
         }
     }
 }

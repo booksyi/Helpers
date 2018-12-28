@@ -9,17 +9,19 @@ namespace HelpersForCore
 {
     public class CodingHelper
     {
+        public static Dictionary<string, string> GenerateSynonyms = new Dictionary<string, string>
+        {
+            { "@@Space", " " },
+            { "@@Endline", "\r\n" },
+            { "@@Tab", "\t" }
+        };
+
         public static string Generate(GenerateNode root)
         {
-            const string paramLeft = "{{";
+            const string paramLeft = "{{#";
             const string paramRight = "}}";
-            const string eachSeparator = "|";
-            Dictionary<string, string> separatorSynonyms = new Dictionary<string, string>
-            {
-                { "@@Space", " " },
-                { "@@Endline", "\r\n" },
-                { "@@Tab", "\t" }
-            };
+            const string eachSeparator = ",";
+            const string withDefault = "|";
 
             if (string.IsNullOrWhiteSpace(root.Text))
             {
@@ -36,58 +38,61 @@ namespace HelpersForCore
                 int paramEndIndex = result.IndexOf(paramRight, paramStartIndex) - 1;
                 int lineStartIndex = result.Substring(0, paramStartIndex).LastIndexOf("\n") + 1;
                 int lineEndIndex = CSharpHelper.Using(result.IndexOf("\n", lineStartIndex + 1), x => x >= 0 ? x : result.Length) - 1;
-                string prefix = result.Substring(lineStartIndex, paramStartIndex - paramLeft.Length - lineStartIndex);
-                string suffix = result.Substring(paramEndIndex + paramRight.Length + 1, lineEndIndex - (paramEndIndex + paramRight.Length));
-                string paramKey = null, paramValue = "";
-                if (paramStartIndex < paramEndIndex && paramEndIndex < lineEndIndex)
+                int separatorStartIndex = CSharpHelper.Using(result.Substring(0, paramEndIndex).IndexOf(eachSeparator, paramStartIndex), x => x >= 0 ? x + eachSeparator.Length : -1);
+                int defaultStartIndex = CSharpHelper.Using(result.Substring(0, paramEndIndex).IndexOf(withDefault, Math.Max(paramStartIndex, separatorStartIndex)), x => x >= 0 ? x + withDefault.Length : -1);
+                int separatorEndIndex = defaultStartIndex >= 0 ? defaultStartIndex - withDefault.Length - 1 : paramEndIndex;
+                int defaultEndIndex = paramEndIndex;
+                int keyStartIndex = paramStartIndex;
+                int keyEndIndex = separatorStartIndex >= 0 ? separatorStartIndex - eachSeparator.Length - 1 : defaultStartIndex >= 0 ? defaultStartIndex - withDefault.Length - 1 : paramEndIndex;
+                if (paramStartIndex < paramEndIndex
+                    && paramEndIndex < lineEndIndex
+                    && separatorStartIndex < paramEndIndex
+                    && defaultStartIndex < paramEndIndex)
                 {
-                    int separatorIndex = result.Substring(0, lineEndIndex + 1).IndexOf(eachSeparator, paramStartIndex);
+                    string prefix = result.Substring(lineStartIndex, paramStartIndex - paramLeft.Length - lineStartIndex);
+                    string suffix = result.Substring(paramEndIndex + paramRight.Length + 1, lineEndIndex - (paramEndIndex + paramRight.Length));
+                    string key = result.Substring(keyStartIndex, keyEndIndex - keyStartIndex + 1).Trim();
+                    string value = "";
                     string param = result.Substring(paramStartIndex, paramEndIndex - paramStartIndex + 1);
-                    #region Get Separator
-                    string separator = "";
-                    if (param.Contains(eachSeparator))
+                    string separator = separatorStartIndex >= 0 ? result.Substring(separatorStartIndex, separatorEndIndex - separatorStartIndex + 1).Trim() : "";
+                    string @default = defaultStartIndex >= 0 ? result.Substring(defaultStartIndex, defaultEndIndex - defaultStartIndex + 1).Trim() : "";
+                    foreach (var synonym in GenerateSynonyms)
                     {
-                        separator = result.Substring(separatorIndex + 1, paramEndIndex - separatorIndex).Trim();
-                        foreach (var synonym in separatorSynonyms)
+                        separator = separator.Replace(synonym.Key, synonym.Value);
+                        @default = @default.Replace(synonym.Key, synonym.Value);
+                    }
+                    #region Apply
+                    if (string.IsNullOrWhiteSpace(key) == false)
+                    {
+                        if (root.Children.Any(x => x.Name == key))
                         {
-                            separator = separator.Replace(synonym.Key, synonym.Value);
-                        }
-                    }
-                    #endregion
-                    #region Get Key and Value
-                    if (param.Contains(eachSeparator))
-                    {
-                        paramKey = result.Substring(paramStartIndex, separatorIndex - paramStartIndex).Trim();
-                    }
-                    else
-                    {
-                        paramKey = param.Trim();
-                    }
-                    if ((string.IsNullOrWhiteSpace(paramKey) == false)
-                        && root.Children.Any(x => x.Name == paramKey))
-                    {
-                        paramValue = string.Join(
-                            separator,
-                            root.Children
-                                .Where(x => x.Name == paramKey)
-                                .Select(node =>
-                                {
-                                    if (node.Children.Any())
+                            value = string.Join(
+                                separator,
+                                root.Children
+                                    .Where(x => x.Name == key)
+                                    .Select(node =>
                                     {
-                                        return Generate(node);
-                                    }
-                                    return node.Text;
-                                }));
-                    }
-                    #endregion
-                    #region Apply Value
-                    if (string.IsNullOrWhiteSpace(paramKey) == false)
-                    {
+                                        string nodeValue = null;
+                                        if (node.Children.Any())
+                                        {
+                                            nodeValue = Generate(node);
+                                        }
+                                        else
+                                        {
+                                            nodeValue = node.Text;
+                                        }
+                                        if (string.IsNullOrWhiteSpace(nodeValue))
+                                        {
+                                            nodeValue = @default;
+                                        }
+                                        return nodeValue;
+                                    }));
+                        }
                         if (string.IsNullOrWhiteSpace(prefix))
                         {
-                            paramValue = paramValue.Replace("\n", $"\n{prefix}");
+                            value = value.Replace("\n", $"\n{prefix}");
                         }
-                        if (string.IsNullOrWhiteSpace(paramValue)
+                        if (string.IsNullOrWhiteSpace(value)
                             && string.IsNullOrWhiteSpace(prefix)
                             && string.IsNullOrWhiteSpace(suffix))
                         {
@@ -104,15 +109,19 @@ namespace HelpersForCore
                         }
                         else
                         {
-                            result = $"{result.Substring(0, paramStartIndex - paramLeft.Length)}{paramValue}{result.Substring(paramEndIndex + paramRight.Length + 1)}";
-                            searchIndex = paramStartIndex - paramLeft.Length + paramValue.Length;
+                            result = $"{result.Substring(0, paramStartIndex - paramLeft.Length)}{value}{result.Substring(paramEndIndex + paramRight.Length + 1)}";
+                            searchIndex = paramStartIndex - paramLeft.Length + value.Length;
                         }
                     }
                     else
                     {
-                        searchIndex = paramStartIndex + param.Length;
+                        searchIndex = paramStartIndex + paramRight.Length;
                     }
                     #endregion
+                }
+                else
+                {
+                    searchIndex = paramStartIndex + paramRight.Length;
                 }
                 paramStartIndex = searchIndex >= 0 ? result.IndexOf(paramLeft, searchIndex) : -1;
             }
