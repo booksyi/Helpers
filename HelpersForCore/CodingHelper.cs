@@ -72,21 +72,16 @@ namespace HelpersForCore
                                     .Where(x => x.Name == key)
                                     .Select(node =>
                                     {
-                                        string nodeValue = null;
                                         if (node.Children.Any())
                                         {
-                                            nodeValue = Generate(node);
+                                            return Generate(node);
                                         }
-                                        else
-                                        {
-                                            nodeValue = node.Text;
-                                        }
-                                        if (string.IsNullOrWhiteSpace(nodeValue))
-                                        {
-                                            nodeValue = @default;
-                                        }
-                                        return nodeValue;
+                                        return node.Text;
                                     }));
+                        }
+                        if (string.IsNullOrWhiteSpace(value))
+                        {
+                            value = @default;
                         }
                         if (string.IsNullOrWhiteSpace(prefix))
                         {
