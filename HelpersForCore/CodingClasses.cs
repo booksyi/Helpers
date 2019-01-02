@@ -9,8 +9,10 @@ namespace HelpersForCore
     {
         public string TableName { get; set; }
         public IEnumerable<Field> Fields { get; set; }
+        public TableForCsharp ForCs { get; set; } = new TableForCsharp();
 
         public Field Identity { get => Fields.FirstOrDefault(x => x.IsIdentity); }
+        public IEnumerable<Field> PrimaryKeys { get => Fields.Where(x => x.IsPrimaryKey); }
 
         public class Field
         {
@@ -28,16 +30,21 @@ namespace HelpersForCore
             public int Prec { get; set; }
             public int Scale { get; set; }
             public string Description { get; set; }
-            public ForCsharp ForCs { get; set; } = new ForCsharp();
-            public ForTypeScript ForTs { get; set; } = new ForTypeScript();
+            public FieldForCsharp ForCs { get; set; } = new FieldForCsharp();
+            public FieldForTypeScript ForTs { get; set; } = new FieldForTypeScript();
         }
 
-        public class ForCsharp
+        public class TableForCsharp
+        {
+            public string ModelName { get; set; }
+        }
+
+        public class FieldForCsharp
         {
             public IEnumerable<string> EFAttributes { get; set; }
             public string TypeName { get; set; }
         }
-        public class ForTypeScript
+        public class FieldForTypeScript
         {
             public string TypeName { get; set; }
         }

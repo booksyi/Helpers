@@ -155,6 +155,7 @@ namespace HelpersForCore
             SqlHelper sqlHelper = new SqlHelper(connectionString);
             DbTableSchema schema = new DbTableSchema();
             schema.TableName = tableName;
+            schema.ForCs.ModelName = tableName;
             schema.Fields = sqlHelper.ExecuteDataTable(@"
                 SELECT c.NAME                      AS NAME, 
                        t.NAME                      AS TypeName, 
@@ -210,6 +211,14 @@ namespace HelpersForCore
                 field.ForCs.TypeName = GetCsTypeName(field);
             }
             return schema;
+        }
+
+        /// <summary>
+        /// 取得 DB 多個 Table 的結構資訊
+        /// </summary>
+        public static IEnumerable<DbTableSchema> GetDbTableSchema(string connectionString, IEnumerable<string> tableNames)
+        {
+            return tableNames.Select(x => GetDbTableSchema(connectionString, x));
         }
 
         /// <summary>
