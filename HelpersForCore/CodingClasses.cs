@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace HelpersForCore
 {
@@ -52,24 +53,38 @@ namespace HelpersForCore
 
     public class GenerateNode
     {
-        public string Name { get; private set; }
-        public string Text { get; set; }
-        public List<GenerateNode> Children { get; private set; } = new List<GenerateNode>();
+        public string ApplyKey { get; private set; }
+        public string ApplyValue { private get; set; }
+        public string ApplyFilePath { get; set; }
+        public List<GenerateNode> ApplyParameters { get; private set; } = new List<GenerateNode>();
 
-        public GenerateNode(string text)
+        /// <summary>
+        /// 取得 ApplyValue 的值或讀取 ApplyFilePath 路徑的檔案
+        /// </summary>
+        public async Task<string> GetApplyValueAsync()
         {
-            Text = text;
+            if (string.IsNullOrWhiteSpace(ApplyValue))
+            {
+                if ((string.IsNullOrWhiteSpace(ApplyFilePath) == false)
+                    && System.IO.File.Exists(ApplyFilePath))
+                {
+                    return await System.IO.File.ReadAllTextAsync(ApplyFilePath);
+                }
+            }
+            return ApplyValue;
         }
 
-        public GenerateNode(string name, string text)
+        public GenerateNode() { }
+
+        public GenerateNode(string key, string value)
         {
-            Name = name;
-            Text = text;
+            ApplyKey = key;
+            ApplyValue = value;
         }
 
-        public GenerateNode Rename(string newName)
+        public GenerateNode ChangeKey(string newKey)
         {
-            Name = newName;
+            ApplyKey = newKey;
             return this;
         }
     }
