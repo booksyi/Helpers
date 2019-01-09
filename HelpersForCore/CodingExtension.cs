@@ -164,7 +164,7 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 樹狀追蹤
+        /// 轉換成樹狀結構
         /// </summary>
         public static async Task<Dictionary<string, object>> ToDictionaryAsync(this GenerateNode node)
         {
@@ -181,7 +181,9 @@ namespace HelpersForCore
                         }
                         else
                         {
-                            dictionary.Add(x.Key, CSharpHelper.Merge(await Task.WhenAll(x.Select(async y => await y.ToDictionaryAsync()))));
+                            dictionary.Add(x.Key, CSharpHelper.Merge(
+                                (key, index) => $"{key}[{index}]",
+                                await Task.WhenAll(x.Select(async y => await y.ToDictionaryAsync()))));
                         }
                     }
                 }

@@ -737,39 +737,28 @@ namespace HelpersForCore
         /// <summary>
         /// 將多個 Dictionary 合併成一個 Dictionary, 第一個參數可自訂 Key 衝突時的解決方法
         /// </summary>
-        public static Dictionary<string, object> Merge(Func<int, string> keyFommatter, params Dictionary<string, object>[] dictionaries)
+        public static Dictionary<T1, T2> Merge<T1, T2>(Func<T1, int, T1> keyFommatter, params Dictionary<T1, T2>[] dictionaries)
         {
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            Dictionary<string, int> indexes = new Dictionary<string, int>();
+            Dictionary<T1, T2> result = new Dictionary<T1, T2>();
+            Dictionary<T1, int> indexes = new Dictionary<T1, int>();
             foreach (var dictionary in dictionaries)
             {
                 foreach (var keyValue in dictionary)
                 {
-                    string key = keyValue.Key;
+                    T1 key = keyValue.Key;
                     if (!indexes.ContainsKey(key))
                     {
                         indexes.Add(key, 0);
                     }
                     int index = indexes[key]++;
-                    if (keyFommatter == null)
+                    if (keyFommatter != null)
                     {
-                        key = $"{key}[{index}]";
-                    }
-                    else
-                    {
-                        key = keyFommatter(index);
+                        key = keyFommatter(key, index);
                     }
                     result.Add(key, keyValue.Value);
                 }
             }
             return result;
-        }
-        /// <summary>
-        /// 將多個 Dictionary 合併成一個 Dictionary, 第一個參數可自訂 Key 衝突時的解決方法
-        /// </summary>
-        public static Dictionary<string, object> Merge(params Dictionary<string, object>[] dictionaries)
-        {
-            return Merge(null, dictionaries);
         }
     }
 }
