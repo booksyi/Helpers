@@ -168,34 +168,29 @@ namespace HelpersForCore
         /// </summary>
         public static async Task<Dictionary<string, object>> ToDictionaryAsync(this GenerateNode node)
         {
-            Dictionary<string, object> dictionary = new Dictionary<string, object>();
             if (node.ApplyParameters.Any())
             {
+                Dictionary<string, object> dictionary = new Dictionary<string, object>();
                 foreach (var x in node.ApplyParameters.GroupBy(x => x.ApplyKey))
                 {
                     if (x != null && x.Any())
                     {
-                        if (x.Count() == 1
-                            && (x.First().ApplyParameters.Any() == false))
+                        if (x.Count() == 1 && (x.First().ApplyParameters.Any() == false))
                         {
-                            dictionary.Add(
-                                $"{node.ApplyFilePath}({x.Key})",
-                                await x.First().GetApplyValueAsync());
+                            dictionary.Add(x.Key, await x.First().GetApplyValueAsync());
                         }
                         else
                         {
-                            dictionary.Add(
-                                $"{node.ApplyFilePath}({x.Key})",
-                                await Task.WhenAll(x.Select(async y =>await y.ToDictionaryAsync())));
+                            dictionary.Add(x.Key, CSharpHelper.Merge(await Task.WhenAll(x.Select(async y => await y.ToDictionaryAsync()))));
                         }
                     }
                 }
+                return new Dictionary<string, object>() { { node.ApplyFilePath, dictionary } };
             }
             else
             {
-                dictionary.Add(node.ApplyKey, await node.GetApplyValueAsync());
+                return new Dictionary<string, object>() { { node.ApplyKey, await node.GetApplyValueAsync() } };
             }
-            return dictionary;
         }
     }
 }

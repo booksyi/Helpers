@@ -134,6 +134,10 @@ namespace HelpersForCore
         public static IEnumerable<string> GetCsEFAttributes(DbTableSchema.Field field)
         {
             List<string> attributes = new List<string>();
+            if (field.IsIdentity)
+            {
+                attributes.Add("[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+            }
             if (field.TypeName.In("char", "nchar", "ntext", "nvarchar", "text", "varchar", "xml"))
             {
                 if (field.IsNullable == false)

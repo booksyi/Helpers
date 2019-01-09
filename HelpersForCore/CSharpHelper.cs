@@ -11,6 +11,45 @@ namespace HelpersForCore
 {
     public class CSharpHelper
     {
+        static readonly Dictionary<(Type, Type), Func<object, object>> Mappers = new Dictionary<(Type, Type), Func<object, object>>();
+
+        /// <summary>
+        /// 建立兩個類型單向的轉換方法
+        /// </summary>
+        public static void Mapper<T1, T2>(Func<object, object> func)
+            where T1 : class
+            where T2 : class
+        {
+            Type type1 = typeof(T1);
+            Type type2 = typeof(T2);
+            var key = (type1, type2);
+            if (Mappers.ContainsKey(key))
+            {
+                Mappers[key] = func;
+            }
+            else
+            {
+                Mappers.Add(key, func);
+            }
+        }
+        /// <summary>
+        /// 依照以建立的類型轉換方法做類型的轉換
+        /// </summary>
+        public static T2 Map<T1, T2>(T1 source)
+            where T1 : class
+            where T2 : class
+        {
+            Type type1 = typeof(T1);
+            Type type2 = typeof(T2);
+            var key = (type1, type2);
+            if (Mappers.ContainsKey(key))
+            {
+                var func = Mappers[key];
+                return func(source) as T2;
+            }
+            return default(T2);
+        }
+        
         /// <summary>
         /// 傳回一個隨機順序的陣列
         /// </summary>
@@ -693,6 +732,44 @@ namespace HelpersForCore
         public static DateTime GetTheSundayDate(DateTime d)
         {
             return d.AddDays((int)d.DayOfWeek * -1);
+        }
+
+        /// <summary>
+        /// 將多個 Dictionary 合併成一個 Dictionary, 第一個參數可自訂 Key 衝突時的解決方法
+        /// </summary>
+        public static Dictionary<string, object> Merge(Func<int, string> keyFommatter, params Dictionary<string, object>[] dictionaries)
+        {
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            Dictionary<string, int> indexes = new Dictionary<string, int>();
+            foreach (var dictionary in dictionaries)
+            {
+                foreach (var keyValue in dictionary)
+                {
+                    string key = keyValue.Key;
+                    if (!indexes.ContainsKey(key))
+                    {
+                        indexes.Add(key, 0);
+                    }
+                    int index = indexes[key]++;
+                    if (keyFommatter == null)
+                    {
+                        key = $"{key}[{index}]";
+                    }
+                    else
+                    {
+                        key = keyFommatter(index);
+                    }
+                    result.Add(key, keyValue.Value);
+                }
+            }
+            return result;
+        }
+        /// <summary>
+        /// 將多個 Dictionary 合併成一個 Dictionary, 第一個參數可自訂 Key 衝突時的解決方法
+        /// </summary>
+        public static Dictionary<string, object> Merge(params Dictionary<string, object>[] dictionaries)
+        {
+            return Merge(null, dictionaries);
         }
     }
 }
