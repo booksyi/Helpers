@@ -12,13 +12,13 @@ namespace HelpersForCore
         /// <summary>
         /// 取得資料庫的所有資料表名稱
         /// </summary>
-        public static IEnumerable<object> GetDbTableNames(string connectionString)
+        public static IEnumerable<string> GetDbTableNames(string connectionString)
         {
             SqlHelper sqlHelper = new SqlHelper(connectionString);
             return sqlHelper.ExecuteFirstColumn(@"
                 SELECT [name]
                 FROM sysobjects
-                WHERE [type] = 'U'");
+                WHERE [type] = 'U'").Select(x => Convert.ToString(x));
         }
 
         public static DbTableSchema GetDbTableSchemaByContext(string context)

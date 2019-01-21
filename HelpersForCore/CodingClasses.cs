@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -53,29 +55,44 @@ namespace HelpersForCore
 
     public class GenerateNode
     {
-        public string ApplyKey { get; private set; }
-        public string ApplyValue { private get; set; }
-        public string ApplyFilePath { get; set; }
+        public string ApplyKey { get; set; }
+        public string ApplyValue { get; set; }
+        public string ApplyApi { get; set; }
         public List<GenerateNode> ApplyParameters { get; private set; } = new List<GenerateNode>();
 
+        public string ApplyExceptionMessage { get; set; }
+
         /// <summary>
-        /// 取得 ApplyValue 的值或讀取 ApplyFilePath 路徑的檔案
+        /// 取得 ApplyValue 的值或透過 ApplyApi 取得範本
         /// </summary>
-        public async Task<string> GetApplyValueAsync()
+        public async Task<string> GetApplyTextAsync()
         {
-            if (string.IsNullOrWhiteSpace(ApplyValue))
+            if (string.IsNullOrWhiteSpace(ApplyValue) == false)
             {
-                if ((string.IsNullOrWhiteSpace(ApplyFilePath) == false)
-                    && System.IO.File.Exists(ApplyFilePath))
+                return ApplyValue;
+            }
+            if (string.IsNullOrWhiteSpace(ApplyApi) == false)
+            {
+                HttpClient client = new HttpClient();
+                var message = await client.GetAsync(ApplyApi);
+                if (message.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    return await System.IO.File.ReadAllTextAsync(ApplyFilePath);
+                    return await message.Content.ReadAsStringAsync();
+                }
+                else
+                {
+                    ApplyExceptionMessage = $"HttpGet {ApplyApi} Failed.";
+                    return null;
                 }
             }
             return ApplyValue;
         }
 
         public GenerateNode() { }
-
+        public GenerateNode(string key)
+        {
+            ApplyKey = key;
+        }
         public GenerateNode(string key, string value)
         {
             ApplyKey = key;
@@ -87,5 +104,72 @@ namespace HelpersForCore
             ApplyKey = newKey;
             return this;
         }
+    }
+
+    public class RequestNode
+    {
+        public RequestFrom From { get; set; } = RequestFrom.HttpRequest;
+        public string HttpRequestKey { get; set; }
+        public string AdapterName { get; set; }
+        public string AdapterPropertyName { get; set; }
+        public string TemplateUrl { get; set; }
+
+        public Dictionary<string, JToken> HttpRequest { get; set; }
+        public Dictionary<string, RequestAdapterNode> AdapterNodes { get; set; }
+        public Dictionary<string, RequestNode> TemplateRequestNodes { get; set; }
+        public RequestComplex Complex { get; set; }
+
+        public RequestNode() { }
+        public RequestNode(string key)
+        {
+            HttpRequestKey = key;
+        }
+        public RequestNode(string adapter, string property)
+        {
+            From = RequestFrom.Adapter;
+            AdapterName = adapter;
+            AdapterPropertyName = property;
+        }
+    }
+
+    public class RequestComplex
+    {
+        public Dictionary<string, JToken> Adapters { get; set; }
+        public Dictionary<string, IEnumerable<RequestNode>> TemplateRequestNodes { get; set; }
+    }
+
+    public class RequestAdapterNode
+    {
+        public string Url { get; set; }
+        public Dictionary<string, RequestNode> RequestNodes { get; set; }
+        public RequestAdapterType Type { get; set; }
+    }
+
+    public enum RequestFrom
+    {
+        /// <summary>
+        /// 請求
+        /// </summary>
+        HttpRequest,
+        /// <summary>
+        /// 中繼資料
+        /// </summary>
+        Adapter,
+        /// <summary>
+        /// 樣板
+        /// </summary>
+        Template
+    }
+
+    public enum RequestAdapterType
+    {
+        /// <summary>
+        /// 統一
+        /// </summary>
+        Unification,
+        /// <summary>
+        /// 分離
+        /// </summary>
+        Separation
     }
 }

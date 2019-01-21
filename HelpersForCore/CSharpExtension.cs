@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace HelpersForCore
@@ -711,6 +712,44 @@ namespace HelpersForCore
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 如果指定的成員為 null, 則將成員以 new() 取得一個值
+        /// </summary>
+        public static T1 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression) where T2: class, new()
+        {
+            MemberExpression memberExpression = null;
+
+            if (expression.Body is UnaryExpression unaryExpression)
+            {
+                if (unaryExpression.Operand is MemberExpression)
+                {
+                    memberExpression = unaryExpression.Operand as MemberExpression;
+                }
+                else
+                {
+                    throw new ArgumentException();
+                }
+            }
+            else if (expression.Body is MemberExpression)
+            {
+                memberExpression = expression.Body as MemberExpression;
+            }
+
+            if (memberExpression == null)
+            {
+                throw new ArgumentException();
+            }
+
+            PropertyInfo property = memberExpression.Member as PropertyInfo;
+            T2 value = property.GetValue(sender) as T2;
+            if (value == null)
+            {
+                value = new T2();
+                property.SetValue(sender, value);
+            }
+            return sender;
         }
     }
 }
