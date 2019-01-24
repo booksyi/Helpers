@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -50,16 +52,23 @@ namespace HelpersForCore
         public class FieldForTypeScript
         {
             public string TypeName { get; set; }
+            public string DefaultValue { get; set; }
         }
     }
 
     public class GenerateNode
     {
         public string ApplyKey { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ApplyValue { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ApplyApi { get; set; }
+
         public List<GenerateNode> ApplyParameters { get; private set; } = new List<GenerateNode>();
 
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ApplyExceptionMessage { get; set; }
 
         /// <summary>
@@ -106,18 +115,47 @@ namespace HelpersForCore
         }
     }
 
-    public class RequestNode
+    public class RequestSimpleNode
     {
-        public RequestFrom From { get; set; } = RequestFrom.HttpRequest;
-        public string HttpRequestKey { get; set; }
-        public string AdapterName { get; set; }
-        public string AdapterPropertyName { get; set; }
-        public string TemplateUrl { get; set; }
+        public RequestSimpleFrom From { get; set; } = RequestSimpleFrom.HttpRequest;
 
-        public Dictionary<string, JToken> HttpRequest { get; set; }
-        public Dictionary<string, RequestAdapterNode> AdapterNodes { get; set; }
-        public Dictionary<string, RequestNode> TemplateRequestNodes { get; set; }
-        public RequestComplex Complex { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string HttpRequestKey { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string AdapterName { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string AdapterPropertyName { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, JToken> Adapters { get; set; }
+
+        public RequestSimpleNode() { }
+        public RequestSimpleNode(string key)
+        {
+            HttpRequestKey = key;
+        }
+        public RequestSimpleNode(string adapter, string property)
+        {
+            From = RequestSimpleFrom.Adapter;
+            AdapterName = adapter;
+            AdapterPropertyName = property;
+        }
+    }
+
+    public class RequestNode : RequestSimpleNode
+    {
+        public new RequestFrom From { get; set; } = RequestFrom.HttpRequest;
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string TemplateUrl { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, RequestNode> SimpleTemplateRequestNodes { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, IEnumerable<RequestNode>> ComplexTemplateRequestNodes { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public Dictionary<string, AdapterNode> AdapterNodes { get; set; }
 
         public RequestNode() { }
         public RequestNode(string key)
@@ -132,19 +170,29 @@ namespace HelpersForCore
         }
     }
 
-    public class RequestComplex
-    {
-        public Dictionary<string, JToken> Adapters { get; set; }
-        public Dictionary<string, IEnumerable<RequestNode>> TemplateRequestNodes { get; set; }
-    }
-
-    public class RequestAdapterNode
+    public class AdapterNode
     {
         public string Url { get; set; }
-        public Dictionary<string, RequestNode> RequestNodes { get; set; }
-        public RequestAdapterType Type { get; set; }
+        public Dictionary<string, RequestSimpleNode> RequestNodes { get; set; }
+        public AdapterType Type { get; set; }
+        public AdapterHttpMethod HttpMethod { get; set; }
+        public string[] ResponseConfines { get; set; }
     }
 
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum RequestSimpleFrom
+    {
+        /// <summary>
+        /// 請求
+        /// </summary>
+        HttpRequest,
+        /// <summary>
+        /// 中繼資料
+        /// </summary>
+        Adapter
+    }
+
+    [JsonConverter(typeof(StringEnumConverter))]
     public enum RequestFrom
     {
         /// <summary>
@@ -161,7 +209,8 @@ namespace HelpersForCore
         Template
     }
 
-    public enum RequestAdapterType
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum AdapterType
     {
         /// <summary>
         /// 統一
@@ -171,5 +220,12 @@ namespace HelpersForCore
         /// 分離
         /// </summary>
         Separation
+    }
+
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum AdapterHttpMethod
+    {
+        Get,
+        Post
     }
 }

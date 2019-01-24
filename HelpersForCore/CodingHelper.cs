@@ -94,6 +94,8 @@ namespace HelpersForCore
                 field.TypeFullName = GetDbTypeFullName(field);
                 field.ForCs.EFAttributes = GetCsEFAttributes(field);
                 field.ForCs.TypeName = GetCsTypeName(field);
+                field.ForTs.TypeName = GetTsTypeName(field);
+                field.ForTs.DefaultValue = GetTsDefaultValue(field);
             }
             return schema;
         }
@@ -269,7 +271,7 @@ namespace HelpersForCore
                 case "ntext":
                     return "string";
                 case "numeric":
-                    return $"number";
+                    return "number";
                 case "nvarchar":
                     return "string";
                 case "real":
@@ -300,6 +302,22 @@ namespace HelpersForCore
                     return "string";
                 default:
                     return null;
+            }
+        }
+
+        public static string GetTsDefaultValue(DbTableSchema.Field field)
+        {
+            switch (field.ForTs.TypeName)
+            {
+                case "boolean":
+                    return "false";
+                case "number":
+                    return "0";
+                case "string":
+                    return "\"\"";
+                case "any":
+                default:
+                    return "null";
             }
         }
 

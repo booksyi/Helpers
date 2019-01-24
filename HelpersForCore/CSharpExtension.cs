@@ -720,23 +720,15 @@ namespace HelpersForCore
         public static T1 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression) where T2: class, new()
         {
             MemberExpression memberExpression = null;
-
-            if (expression.Body is UnaryExpression unaryExpression)
+            if (expression.Body is UnaryExpression unaryExpression
+                && unaryExpression.Operand is MemberExpression)
             {
-                if (unaryExpression.Operand is MemberExpression)
-                {
-                    memberExpression = unaryExpression.Operand as MemberExpression;
-                }
-                else
-                {
-                    throw new ArgumentException();
-                }
+                memberExpression = unaryExpression.Operand as MemberExpression;
             }
             else if (expression.Body is MemberExpression)
             {
                 memberExpression = expression.Body as MemberExpression;
             }
-
             if (memberExpression == null)
             {
                 throw new ArgumentException();
@@ -750,6 +742,42 @@ namespace HelpersForCore
                 property.SetValue(sender, value);
             }
             return sender;
+        }
+
+        /// <summary>
+        /// 在 Url 後面加上 QueryString
+        /// </summary>
+        public static string AppendQueryString(this string url, string queryString)
+        {
+            if (url.Contains("?"))
+            {
+                if (url.EndsWith("?") || url.EndsWith("&"))
+                {
+                    if (queryString.StartsWith("?") || queryString.StartsWith("&"))
+                    {
+                        return $"{url}{queryString.Substring(1)}";
+                    }
+                    return $"{url}{queryString}";
+                }
+                return $"{url}&{queryString}";
+            }
+            if (queryString.StartsWith("?") || queryString.StartsWith("&"))
+            {
+                return $"{url}?{queryString.Substring(1)}";
+            }
+            return $"{url}?{queryString}";
+        }
+
+        /// <summary>
+        /// 判斷 Dictionary 是否有成員
+        /// </summary>
+        public static bool NotNullAndAny<T1, T2>(this Dictionary<T1, T2> sender)
+        {
+            if (sender == null)
+            {
+                return false;
+            }
+            return sender.Any();
         }
     }
 }
