@@ -233,6 +233,10 @@ namespace HelpersForCore
                     string queryValue = Convert.ToString(request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value);
                     queries.Add($"{key}={HttpUtility.UrlEncode(queryValue)}");
                 }
+                else if (node.From == RequestSimpleFrom.Value)
+                {
+                    queries.Add($"{key}={node.Value}");
+                }
                 else if (node.From == RequestSimpleFrom.Adapter)
                 {
                     if (node.Adapters != null
@@ -277,6 +281,10 @@ namespace HelpersForCore
                     var jToken = request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
                     result.Add(key, jToken);
                 }
+                else if (node.From == RequestSimpleFrom.Value)
+                {
+                    result.Add(key, node.Value);
+                }
                 else if (node.From == RequestSimpleFrom.Adapter)
                 {
                     if (node.Adapters != null
@@ -320,7 +328,14 @@ namespace HelpersForCore
                 var response = await client.PostAsJsonAsync(node.Url, await node.RequestNodes.ToJObjectAsync(request));
                 json = await response.Content.ReadAsStringAsync();
             }
-            return JToken.FromObject(JsonConvert.DeserializeObject(json));
+            try
+            {
+                return JToken.Parse(json);
+            }
+            catch (Exception)
+            {
+                return json;
+            }
         }
 
         /// <summary>
@@ -338,6 +353,10 @@ namespace HelpersForCore
                 string adapterNodeKey = requestNode.AdapterNodes.First().Key;
                 var adapterNode = requestNode.AdapterNodes[adapterNodeKey];
                 requestNode.AdapterNodes.Remove(adapterNodeKey);
+                foreach (var adapterRequestNode in adapterNode.RequestNodes.Values)
+                {
+                    adapterRequestNode.Adapters = requestNode.Adapters;
+                }
                 JToken adapterValue = await adapterNode.ToJTokenAsync(request);
                 if (adapterValue is JObject jObject)
                 {
@@ -479,6 +498,12 @@ namespace HelpersForCore
                     }
                 }
                 return generateNodes;
+            }
+            else if (requestNode.From == RequestFrom.Value)
+            {
+                GenerateNode generateNode = new GenerateNode();
+                generateNode.ApplyValue = requestNode.Value;
+                return new GenerateNode[] { generateNode };
             }
             else if (requestNode.From == RequestFrom.Adapter)
             {

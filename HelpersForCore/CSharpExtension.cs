@@ -1,10 +1,15 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace HelpersForCore
 {
@@ -778,6 +783,43 @@ namespace HelpersForCore
                 return false;
             }
             return sender.Any();
+        }
+
+        public static JObject ToJObject(this IQueryCollection query)
+        {
+            JObject jObject = new JObject();
+            foreach (var param in query)
+            {
+                if (param.Value.Count == 1)
+                {
+                    jObject.Add(param.Key, JToken.FromObject(param.Value.First()));
+                }
+                else
+                {
+                    jObject.Add(param.Key, JToken.FromObject(param.Value));
+                }
+            }
+            return jObject;
+        }
+
+        public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
+        {
+            body.Seek(0, SeekOrigin.Begin);
+            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            {
+                string json = await reader.ReadToEndAsync();
+                return JObject.Parse(json);
+            }
+        }
+
+        public static async Task<T> ToModelAsync<T>(this Stream body, Encoding encoding = null)
+        {
+            body.Seek(0, SeekOrigin.Begin);
+            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            {
+                string json = await reader.ReadToEndAsync();
+                return JsonConvert.DeserializeObject<T>(json);
+            }
         }
     }
 }

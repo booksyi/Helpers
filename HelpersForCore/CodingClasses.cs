@@ -17,7 +17,7 @@ namespace HelpersForCore
         public TableForCsharp ForCs { get; set; } = new TableForCsharp();
 
         public Field Identity { get => Fields.FirstOrDefault(x => x.IsIdentity); }
-        public IEnumerable<Field> PrimaryKeys { get => Fields.Where(x => x.IsPrimaryKey); }
+        public IEnumerable<Field> PrimaryKeys { get => Fields.Where(x => x.IsPrimaryKey).ToArray(); }
 
         public class Field
         {
@@ -123,6 +123,9 @@ namespace HelpersForCore
         public string HttpRequestKey { get; set; }
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string Value { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string AdapterName { get; set; }
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string AdapterPropertyName { get; set; }
@@ -187,6 +190,10 @@ namespace HelpersForCore
         /// </summary>
         HttpRequest,
         /// <summary>
+        /// 固定值
+        /// </summary>
+        Value,
+        /// <summary>
         /// 中繼資料
         /// </summary>
         Adapter
@@ -199,6 +206,10 @@ namespace HelpersForCore
         /// 請求
         /// </summary>
         HttpRequest,
+        /// <summary>
+        /// 固定值
+        /// </summary>
+        Value,
         /// <summary>
         /// 中繼資料
         /// </summary>
