@@ -802,6 +802,15 @@ namespace HelpersForCore
             return jObject;
         }
 
+        public static async Task<string> ToStringAsync(this Stream body, Encoding encoding = null)
+        {
+            body.Seek(0, SeekOrigin.Begin);
+            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            {
+                return await reader.ReadToEndAsync();
+            }
+        }
+
         public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
         {
             body.Seek(0, SeekOrigin.Begin);
@@ -812,7 +821,7 @@ namespace HelpersForCore
             }
         }
 
-        public static async Task<T> ToModelAsync<T>(this Stream body, Encoding encoding = null)
+        public static async Task<T> ToClassAsync<T>(this Stream body, Encoding encoding = null) where T : class, new()
         {
             body.Seek(0, SeekOrigin.Begin);
             using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
