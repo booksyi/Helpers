@@ -889,35 +889,56 @@ namespace HelpersForCore
         /// </summary>
         public static async Task<string> ToStringAsync(this Stream body, Encoding encoding = null)
         {
-            body.Seek(0, SeekOrigin.Begin);
-            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            if (body.CanRead)
             {
-                return await reader.ReadToEndAsync();
+                if (body.CanSeek)
+                {
+                    body.Seek(0, SeekOrigin.Begin);
+                }
+                using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+                {
+                    return await reader.ReadToEndAsync();
+                }
             }
+            return null;
         }
         /// <summary>
         /// 將 Request.Body 轉成 JObject
         /// </summary>
         public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
         {
-            body.Seek(0, SeekOrigin.Begin);
-            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            if (body.CanRead)
             {
-                string json = await reader.ReadToEndAsync();
-                return JObject.Parse(json);
+                if (body.CanSeek)
+                {
+                    body.Seek(0, SeekOrigin.Begin);
+                }
+                using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+                {
+                    string json = await reader.ReadToEndAsync();
+                    return JObject.Parse(json);
+                }
             }
+            return null;
         }
         /// <summary>
         /// 將 Request.Body 轉成自訂的 Class
         /// </summary>
         public static async Task<T> ToObjectAsync<T>(this Stream body, Encoding encoding = null) where T : class, new()
         {
-            body.Seek(0, SeekOrigin.Begin);
-            using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+            if (body.CanRead)
             {
-                string json = await reader.ReadToEndAsync();
-                return JsonConvert.DeserializeObject<T>(json);
+                if (body.CanSeek)
+                {
+                    body.Seek(0, SeekOrigin.Begin);
+                }
+                using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+                {
+                    string json = await reader.ReadToEndAsync();
+                    return JsonConvert.DeserializeObject<T>(json);
+                }
             }
+            return null;
         }
     }
 }

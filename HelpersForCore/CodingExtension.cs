@@ -272,17 +272,21 @@ namespace HelpersForCore
             string json = null;
             if (node.HttpMethod == AdapterHttpMethod.Get)
             {
-                string queryString = node.RequestNodes
-                    .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
-                    .ToQueryString();
-                json = await client.GetStringAsync(
-                    node.Url.AppendQueryString(queryString));
+                string url = node.Url;
+                if (node.RequestNodes.NotNullAny())
+                {
+                    string queryString = node.RequestNodes
+                        .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
+                        .ToQueryString();
+                    url = url.AppendQueryString(queryString);
+                }
+                json = await client.GetStringAsync(url);
             }
             else if (node.HttpMethod == AdapterHttpMethod.Post)
             {
                 var response = await client.PostAsJsonAsync(
                     node.Url,
-                    node.RequestNodes
+                    node.RequestNodes?
                         .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
                         .ToJObject(request));
                 json = await response.Content.ReadAsStringAsync();
@@ -430,9 +434,12 @@ namespace HelpersForCore
                 string adapterNodeKey = requestNode.AdapterNodes.First().Key;
                 var adapterNode = requestNode.AdapterNodes[adapterNodeKey];
                 requestNode.AdapterNodes.Remove(adapterNodeKey);
-                foreach (var adapterRequestNode in adapterNode.RequestNodes.Values)
+                if (adapterNode.RequestNodes?.Values != null)
                 {
-                    adapterRequestNode.Adapters = requestNode.Adapters;
+                    foreach (var adapterRequestNode in adapterNode.RequestNodes.Values)
+                    {
+                        adapterRequestNode.Adapters = requestNode.Adapters;
+                    }
                 }
                 JToken adapterValue = await adapterNode.ToJTokenAsync(request);
                 if (adapterValue is JObject jObject)
