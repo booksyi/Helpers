@@ -65,13 +65,13 @@ namespace HelpersForCore
         /// <summary>
         /// 以 GenerateNode 生成代碼
         /// </summary>
-        public static async Task<string> GenerateAsync(this GenerateNode root)
+        public static async Task<string> GenerateAsync(this GenerateNode root,
+            string paramLeft = "{{#",   // 參數起始的保留字
+            string paramRight = "}}",   // 參數結束的保留字
+            string eachSeparator = ",", // 參數設定分隔符的保留字
+            string withDefault = "|"    // 參數設定預設值的保留字
+        )
         {
-            const string paramLeft = "{{#";
-            const string paramRight = "}}";
-            const string eachSeparator = ",";
-            const string withDefault = "|";
-
             string result = await root.GetApplyTextAsync();
             if (string.IsNullOrWhiteSpace(result))
             {
@@ -175,7 +175,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 GenerateNode 轉換成容易閱讀的樹狀結構
         /// </summary>
-        public static async Task<JToken> ToJTokenAsync(this GenerateNode node)
+        public static async Task<JToken> ToJTokenForReadAsync(this GenerateNode node)
         {
             if (string.IsNullOrWhiteSpace(node.ApplyApi))
             {
@@ -203,7 +203,7 @@ namespace HelpersForCore
                                 {
                                     jObject.Add(
                                         groupParameters.Key,
-                                        await groupParameters.First().ToJTokenAsync());
+                                        await groupParameters.First().ToJTokenForReadAsync());
                                 }
                             }
                             else
@@ -211,7 +211,7 @@ namespace HelpersForCore
                                 JArray jArray = new JArray();
                                 foreach (var parameter in groupParameters)
                                 {
-                                    jArray.Add(await parameter.ToJTokenAsync());
+                                    jArray.Add(await parameter.ToJTokenForReadAsync());
                                 }
                                 jObject.Add(groupParameters.Key, jArray);
                             }
@@ -222,110 +222,69 @@ namespace HelpersForCore
             }
         }
 
-        public static async Task<string> ToQueryString(this Dictionary<string, RequestSimpleNode> nodes, JObject request)
+        /// <summary>
+        /// 將 RequestSimpleNode 轉成 JToken
+        /// </summary>
+        public static JToken ToJToken(this RequestSimpleNode node, JObject request)
         {
-            List<string> queries = new List<string>();
-            foreach (var key in nodes.Keys)
+            if (node.From == RequestSimpleFrom.HttpRequest)
             {
-                var node = nodes[key];
-                if (node.From == RequestSimpleFrom.HttpRequest)
+                return request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
+            }
+            else if (node.From == RequestSimpleFrom.Value)
+            {
+                return node.Value;
+            }
+            else if (node.From == RequestSimpleFrom.Adapter)
+            {
+                if (node.Adapters != null
+                    && node.Adapters.ContainsKey(node.AdapterName))
                 {
-                    string queryValue = Convert.ToString(request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value);
-                    queries.Add($"{key}={HttpUtility.UrlEncode(queryValue)}");
-                }
-                else if (node.From == RequestSimpleFrom.Value)
-                {
-                    queries.Add($"{key}={node.Value}");
-                }
-                else if (node.From == RequestSimpleFrom.Adapter)
-                {
-                    if (node.Adapters != null
-                        && node.Adapters.ContainsKey(node.AdapterName))
+                    if (string.IsNullOrWhiteSpace(node.AdapterPropertyName)
+                        && node.Adapters[node.AdapterName] is JValue jValue)
                     {
-                        if (string.IsNullOrWhiteSpace(node.AdapterPropertyName)
-                            && node.Adapters[node.AdapterName] is JValue jValue)
+                        return jValue;
+                    }
+                    else if (node.Adapters[node.AdapterName] is JObject jObject)
+                    {
+                        string[] propertyNames = node.AdapterPropertyName.Split('.');
+                        JToken jToken = jObject;
+                        foreach (var propertyName in propertyNames)
                         {
-                            queries.Add($"{key}={HttpUtility.UrlEncode(Convert.ToString(jValue))}");
+                            jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
                         }
-                        else if (node.Adapters[node.AdapterName] is JObject jObject)
-                        {
-                            string[] propertyNames = node.AdapterPropertyName.Split('.');
-                            JToken jToken = jObject;
-                            foreach (var propertyName in propertyNames)
-                            {
-                                jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                            }
-                            queries.Add($"{key}={HttpUtility.UrlEncode(Convert.ToString(jToken))}");
-                        }
-                        else if (node.Adapters[node.AdapterName] is JArray jArray)
-                        {
-                            foreach (var jToken in jArray)
-                            {
-                                queries.Add($"{key}={HttpUtility.UrlEncode(Convert.ToString(jToken))}");
-                            }
-                        }
+                        return jToken;
+                    }
+                    else if (node.Adapters[node.AdapterName] is JArray jArray)
+                    {
+                        return jArray;
                     }
                 }
             }
-            return string.Join("&", queries);
+            return null;
         }
-
-        public static async Task<JObject> ToJObjectAsync(this Dictionary<string, RequestSimpleNode> nodes, JObject request)
-        {
-            JObject result = new JObject();
-            foreach (var key in nodes.Keys)
-            {
-                var node = nodes[key];
-                if (node.From == RequestSimpleFrom.HttpRequest)
-                {
-                    var jToken = request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                    result.Add(key, jToken);
-                }
-                else if (node.From == RequestSimpleFrom.Value)
-                {
-                    result.Add(key, node.Value);
-                }
-                else if (node.From == RequestSimpleFrom.Adapter)
-                {
-                    if (node.Adapters != null
-                        && node.Adapters.ContainsKey(node.AdapterName))
-                    {
-                        if (string.IsNullOrWhiteSpace(node.AdapterPropertyName)
-                            && node.Adapters[node.AdapterName] is JValue jValue)
-                        {
-                            result.Add(key, jValue);
-                        }
-                        else if (node.Adapters[node.AdapterName] is JObject jObject)
-                        {
-                            string[] propertyNames = node.AdapterPropertyName.Split('.');
-                            JToken jToken = jObject;
-                            foreach (var propertyName in propertyNames)
-                            {
-                                jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                            }
-                            result.Add(key, jToken);
-                        }
-                        else if (node.Adapters[node.AdapterName] is JArray jArray)
-                        {
-                            result.Add(key, jArray);
-                        }
-                    }
-                }
-            }
-            return result;
-        }
-
+        /// <summary>
+        /// 將 AdapterNode 轉成 JToken
+        /// </summary>
         public static async Task<JToken> ToJTokenAsync(this AdapterNode node, JObject request)
         {
             HttpClient client = new HttpClient();
             string json = null;
             if (node.HttpMethod == AdapterHttpMethod.Get)
             {
-                json = await client.GetStringAsync(node.Url.AppendQueryString(await node.RequestNodes.ToQueryString(request)));
+                string queryString = node.RequestNodes
+                    .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
+                    .ToQueryString();
+                json = await client.GetStringAsync(
+                    node.Url.AppendQueryString(queryString));
             }
             else if (node.HttpMethod == AdapterHttpMethod.Post)
             {
-                var response = await client.PostAsJsonAsync(node.Url, await node.RequestNodes.ToJObjectAsync(request));
+                var response = await client.PostAsJsonAsync(
+                    node.Url,
+                    node.RequestNodes
+                        .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
+                        .ToJObject(request));
                 json = await response.Content.ReadAsStringAsync();
             }
             try
@@ -337,9 +296,127 @@ namespace HelpersForCore
                 return json;
             }
         }
+        /// <summary>
+        /// 將 RequestNode 轉成 IEnumerable&lt;GenerateNode&gt;
+        /// </summary>
+        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodeAsync(this RequestNode requestNode, JObject request)
+        {
+            if (requestNode.AdapterNodes.NotNullAny())
+            {
+                List<GenerateNode> generateNodes = new List<GenerateNode>();
+                var nodes = await requestNode.GenerateAdapters(request);
+                foreach (var node in nodes)
+                {
+                    generateNodes.AddRange(await node.ToGenerateNodeAsync(request));
+                }
+                return generateNodes;
+            }
+            if (requestNode.SimpleTemplateRequestNodes.NotNullAny())
+            {
+                await GenerateComplex(requestNode, request);
+            }
+            if (requestNode.From == RequestFrom.HttpRequest)
+            {
+                List<GenerateNode> generateNodes = new List<GenerateNode>();
+                var jToken = request.Property(requestNode.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                if (jToken is JValue jValue)
+                {
+                    generateNodes.Add(new GenerateNode(
+                        requestNode.HttpRequestKey,
+                        Convert.ToString(jValue)));
+                }
+                else if (jToken is JObject jObject)
+                {
+                    generateNodes.Add(new GenerateNode(
+                        requestNode.HttpRequestKey,
+                        Convert.ToString(jObject)));
+                }
+                else if (jToken is JArray jArray)
+                {
+                    foreach (var value in jArray)
+                    {
+                        generateNodes.Add(new GenerateNode(
+                            requestNode.HttpRequestKey,
+                            Convert.ToString(value)));
+                    }
+                }
+                return generateNodes;
+            }
+            else if (requestNode.From == RequestFrom.Value)
+            {
+                GenerateNode generateNode = new GenerateNode();
+                generateNode.ApplyValue = requestNode.Value;
+                return new GenerateNode[] { generateNode };
+            }
+            else if (requestNode.From == RequestFrom.Adapter)
+            {
+                List<GenerateNode> generateNodes = new List<GenerateNode>();
+                if (requestNode.Adapters != null
+                    && requestNode.Adapters.Any()
+                    && requestNode.Adapters.ContainsKey(requestNode.AdapterName))
+                {
+                    string[] propertyNames = requestNode.AdapterPropertyName?.Split('.');
+                    JToken jToken = requestNode.Adapters[requestNode.AdapterName];
+                    if (jToken is JObject && propertyNames != null && propertyNames.Any())
+                    {
+                        foreach (var propertyName in propertyNames)
+                        {
+                            jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                        }
+                    }
+                    if (jToken != null)
+                    {
+                        if (jToken is JValue jValue)
+                        {
+                            generateNodes.Add(new GenerateNode(
+                                requestNode.AdapterPropertyName,
+                                Convert.ToString(jValue)));
+                        }
+                        else if (jToken is JObject jObject)
+                        {
+                            generateNodes.Add(new GenerateNode(
+                                requestNode.AdapterPropertyName,
+                                Convert.ToString(jObject)));
+                        }
+                        else if (jToken is JArray jArray)
+                        {
+                            foreach (var value in jArray)
+                            {
+                                generateNodes.Add(new GenerateNode(
+                                    requestNode.AdapterPropertyName,
+                                    Convert.ToString(value)));
+                            }
+                        }
+                    }
+                }
+                return generateNodes;
+            }
+            else if (requestNode.From == RequestFrom.Template)
+            {
+                GenerateNode generateNode = new GenerateNode();
+                generateNode.ApplyApi = requestNode.TemplateUrl;
+                if (requestNode.ComplexTemplateRequestNodes != null)
+                {
+                    foreach (var key in requestNode.ComplexTemplateRequestNodes.Keys)
+                    {
+                        var parameterNodes = requestNode.ComplexTemplateRequestNodes[key];
+                        foreach (var node in parameterNodes)
+                        {
+                            var children = await ToGenerateNodeAsync(node, request);
+                            foreach (var child in children)
+                            {
+                                generateNode.AppendChild(child).ChangeKey(key);
+                            }
+                        }
+                    }
+                }
+                return new GenerateNode[] { generateNode };
+            }
+            return new GenerateNode[0];
+        }
 
         /// <summary>
-        /// AdapterNodes to Adapters
+        /// 依照 RequestNode.AdapterNodes 生成 RequestNode.Adapters
         /// </summary>
         public static async Task<IEnumerable<RequestNode>> GenerateAdapters(this RequestNode requestNode, JObject request)
         {
@@ -427,7 +504,7 @@ namespace HelpersForCore
             return new RequestNode[] { requestNode };
         }
         /// <summary>
-        /// SimpleTemplateRequestNodes to ComplexTemplateRequestNodes
+        /// 依照 RequestNode.SimpleTemplateRequestNodes 生成 RequestNode.ComplexTemplateRequestNodes
         /// </summary>
         public static async Task GenerateComplex(this RequestNode requestNode, JObject request)
         {
@@ -454,122 +531,6 @@ namespace HelpersForCore
                     }
                 }
             }
-        }
-
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNode(this RequestNode requestNode, JObject request)
-        {
-            if (requestNode.AdapterNodes.NotNullAndAny())
-            {
-                List<GenerateNode> generateNodes = new List<GenerateNode>();
-                var nodes = await requestNode.GenerateAdapters(request);
-                foreach (var node in nodes)
-                {
-                    generateNodes.AddRange(await node.ToGenerateNode(request));
-                }
-                return generateNodes;
-            }
-            if (requestNode.SimpleTemplateRequestNodes.NotNullAndAny())
-            {
-                await GenerateComplex(requestNode, request);
-            }
-            if (requestNode.From == RequestFrom.HttpRequest)
-            {
-                List<GenerateNode> generateNodes = new List<GenerateNode>();
-                var jToken = request.Property(requestNode.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                if (jToken is JValue jValue)
-                {
-                    generateNodes.Add(new GenerateNode(
-                        requestNode.HttpRequestKey,
-                        Convert.ToString(jValue)));
-                }
-                else if (jToken is JObject jObject)
-                {
-                    generateNodes.Add(new GenerateNode(
-                        requestNode.HttpRequestKey,
-                        Convert.ToString(jObject)));
-                }
-                else if (jToken is JArray jArray)
-                {
-                    foreach (var value in jArray)
-                    {
-                        generateNodes.Add(new GenerateNode(
-                            requestNode.HttpRequestKey,
-                            Convert.ToString(value)));
-                    }
-                }
-                return generateNodes;
-            }
-            else if (requestNode.From == RequestFrom.Value)
-            {
-                GenerateNode generateNode = new GenerateNode();
-                generateNode.ApplyValue = requestNode.Value;
-                return new GenerateNode[] { generateNode };
-            }
-            else if (requestNode.From == RequestFrom.Adapter)
-            {
-                List<GenerateNode> generateNodes = new List<GenerateNode>();
-                if (requestNode.Adapters != null
-                    && requestNode.Adapters.Any()
-                    && requestNode.Adapters.ContainsKey(requestNode.AdapterName))
-                {
-                    string[] propertyNames = requestNode.AdapterPropertyName?.Split('.');
-                    JToken jToken = requestNode.Adapters[requestNode.AdapterName];
-                    if (jToken is JObject && propertyNames != null && propertyNames.Any())
-                    {
-                        foreach (var propertyName in propertyNames)
-                        {
-                            jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                        }
-                    }
-                    if (jToken != null)
-                    {
-                        if (jToken is JValue jValue)
-                        {
-                            generateNodes.Add(new GenerateNode(
-                                requestNode.AdapterPropertyName,
-                                Convert.ToString(jValue)));
-                        }
-                        else if (jToken is JObject jObject)
-                        {
-                            generateNodes.Add(new GenerateNode(
-                                requestNode.AdapterPropertyName,
-                                Convert.ToString(jObject)));
-                        }
-                        else if (jToken is JArray jArray)
-                        {
-                            foreach (var value in jArray)
-                            {
-                                generateNodes.Add(new GenerateNode(
-                                    requestNode.AdapterPropertyName,
-                                    Convert.ToString(value)));
-                            }
-                        }
-                    }
-                }
-                return generateNodes;
-            }
-            else if(requestNode.From == RequestFrom.Template)
-            {
-                GenerateNode generateNode = new GenerateNode();
-                generateNode.ApplyApi = requestNode.TemplateUrl;
-                if (requestNode.ComplexTemplateRequestNodes != null)
-                {
-                    foreach (var key in requestNode.ComplexTemplateRequestNodes.Keys)
-                    {
-                        var parameterNodes = requestNode.ComplexTemplateRequestNodes[key];
-                        foreach (var node in parameterNodes)
-                        {
-                            var children = await ToGenerateNode(node, request);
-                            foreach (var child in children)
-                            {
-                                generateNode.AppendChild(child).ChangeKey(key);
-                            }
-                        }
-                    }
-                }
-                return new GenerateNode[] { generateNode };
-            }
-            return new GenerateNode[0];
         }
     }
 }

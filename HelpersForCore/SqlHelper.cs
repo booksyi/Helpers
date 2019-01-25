@@ -82,16 +82,16 @@ namespace HelpersForCore
             System.Diagnostics.Debug.WriteLine($@"
                 ----Connection String-----------------------------
                 -- {connectionString.Replace("\r\n", "\n").Replace("\n", " ")}
-                ----Parameters------------------------------------".CutEmptyHead().DecreaseIndentAllLines());
+                ----Parameters------------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
             foreach (SqlParameter parameter in cmd.Parameters)
             {
                 DebugWrite(parameter);
             }
             System.Diagnostics.Debug.WriteLine($@"
-                ----Command Text----------------------------------".CutEmptyHead().DecreaseIndentAllLines());
-            System.Diagnostics.Debug.WriteLine(cmd.CommandText.CutEmptyHead().DecreaseIndentAllLines());
+                ----Command Text----------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
+            System.Diagnostics.Debug.WriteLine(cmd.CommandText.RemoneHeadEmptyLines().DecreaseIndent());
             System.Diagnostics.Debug.WriteLine($@"
-                ----End-------------------------------------------".CutEmptyHead().DecreaseIndentAllLines());
+                ----End-------------------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
         }
 
         /// <summary>
@@ -193,7 +193,7 @@ namespace HelpersForCore
         /// </summary>
         public IEnumerable<T> ExecuteModels<T>(string commandText, params SqlParameter[] parameters)
         {
-            return ExecuteDataTable(commandText, parameters).Rows.ToModels<T>();
+            return ExecuteDataTable(commandText, parameters).Rows.ToObjects<T>();
         }
 
         /// <summary>
@@ -225,7 +225,7 @@ namespace HelpersForCore
         {
             ExecuteReaderEach(commandText, parameters, dr =>
             {
-                T model = dr.ToModel<T>();
+                T model = dr.ToObject<T>();
                 func(model);
             });
         }
@@ -324,7 +324,7 @@ namespace HelpersForCore
                 conn.Open();
                 cmd.Connection = conn;
                 DebugWrite(cmd);
-                return cmd.ExecuteDataTable().Rows.ToModels<T>();
+                return cmd.ExecuteDataTable().Rows.ToObjects<T>();
             }
         }
 
@@ -486,7 +486,7 @@ namespace HelpersForCore
         /// </summary>
         public async Task<IEnumerable<T>> ExecuteModelsAsync<T>(string commandText, params SqlParameter[] parameters)
         {
-            return (await ExecuteDataTableAsync(commandText, parameters)).Rows.ToModels<T>();
+            return (await ExecuteDataTableAsync(commandText, parameters)).Rows.ToObjects<T>();
         }
 
         /// <summary>
@@ -518,7 +518,7 @@ namespace HelpersForCore
         {
             await ExecuteReaderEachAsync(commandText, parameters, dr =>
             {
-                T model = dr.ToModel<T>();
+                T model = dr.ToObject<T>();
                 func(model);
             });
         }
@@ -617,7 +617,7 @@ namespace HelpersForCore
                 await conn.OpenAsync();
                 cmd.Connection = conn;
                 DebugWrite(cmd);
-                return (await cmd.ExecuteDataTableAsync()).Rows.ToModels<T>();
+                return (await cmd.ExecuteDataTableAsync()).Rows.ToObjects<T>();
             }
         }
 

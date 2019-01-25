@@ -10,6 +10,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace HelpersForCore
 {
@@ -114,15 +115,44 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 找出字典的 Key 對應的值, 沒有可對應的 Key 傳回指定值
+        /// 判斷 Dictionary 是否有成員
         /// </summary>
-        public static T2 CaseValuesOrDefault<T1, T2>(this T1 value, Dictionary<T1, T2> caseValues, T2 defaultValue = default(T2))
+        public static bool NotNullAny<T1, T2>(this Dictionary<T1, T2> sender)
         {
-            if (caseValues.ContainsKey(value))
+            return sender != null && sender.Any();
+        }
+        /// <summary>
+        /// 判斷 IEnumerable 是否有成員
+        /// </summary>
+        public static bool NotNullAny<T>(this IEnumerable<T> sender)
+        {
+            return sender != null && sender.Any();
+        }
+
+        /// <summary>
+        /// 從 Dictionary 取出對應 Key 的值，如果沒有 Key 則傳回指定的預設值
+        /// </summary>
+        public static T2 GetValueOrDefault<T1, T2>(this Dictionary<T1, T2> dictionary, T1 key, T2 defaultValue = default(T2))
+        {
+            if (dictionary.ContainsKey(key))
             {
-                return caseValues[value];
+                return dictionary[key];
             }
             return defaultValue;
+        }
+        /// <summary>
+        /// 加入一個 Key-Value 到 Dictionary，如果已經有存在 Key 則只修改其值
+        /// </summary>
+        public static void AddOrUpdate<T1, T2>(this Dictionary<T1, T2> dictionary, T1 key, T2 value)
+        {
+            if (dictionary.ContainsKey(key) == false)
+            {
+                dictionary.Add(key, value);
+            }
+            else
+            {
+                dictionary[key] = value;
+            }
         }
 
         public static T2 ConvertTo<T1, T2>(this T1 value, Func<T1, T2> converter)
@@ -193,7 +223,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 DataRow 的資料轉換成自訂的 Class
         /// </summary>
-        public static T ToModel<T>(this DataRow dr, bool caseSensitive = false)
+        public static T ToObject<T>(this DataRow dr, bool caseSensitive = false)
         {
             object model = dr.ToTypeObject(typeof(T), caseSensitive);
             if (model != null)
@@ -205,7 +235,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 DataReader 的資料轉換成自訂的 Class
         /// </summary>
-        public static T ToModel<T>(this IDataReader dr, bool caseSensitive = false)
+        public static T ToObject<T>(this IDataReader dr, bool caseSensitive = false)
         {
             object model = dr.ToTypeObject(typeof(T), caseSensitive);
             if (model != null)
@@ -217,7 +247,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 Dictionary 轉換成自訂的 Class
         /// </summary>
-        public static T1 ToModel<T1, T2>(this Dictionary<string, T2> dictionary, bool caseSensitive = false)
+        public static T1 ToObject<T1, T2>(this Dictionary<string, T2> dictionary, bool caseSensitive = false)
         {
             object model = dictionary.ToTypeObject(typeof(T1), caseSensitive);
             if (model != null)
@@ -230,12 +260,12 @@ namespace HelpersForCore
         /// <summary>
         /// 將 DataRowCollection 的每一個 DataRow 都轉換成自訂的 Class 之後, 傳回自訂 Class 的集合
         /// </summary>
-        public static IEnumerable<T> ToModels<T>(this DataRowCollection collection, bool caseSensitive = false)
+        public static IEnumerable<T> ToObjects<T>(this DataRowCollection collection, bool caseSensitive = false)
         {
             List<T> list = new List<T>();
             foreach (DataRow dr in collection)
             {
-                list.Add(dr.ToModel<T>(caseSensitive));
+                list.Add(dr.ToObject<T>(caseSensitive));
             }
             return list;
         }
@@ -424,32 +454,6 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 加入一個 Key-Value 到 Dictionary，如果已經有存在 Key 則只修改其值
-        /// </summary>
-        public static void AddOrUpdate<T1, T2>(this Dictionary<T1, T2> dictionary, T1 key, T2 value)
-        {
-            if (dictionary.ContainsKey(key) == false)
-            {
-                dictionary.Add(key, value);
-            }
-            else
-            {
-                dictionary[key] = value;
-            }
-        }
-        /// <summary>
-        /// 從 Dictionary 取出對應 Key 的值，如果沒有 Key 則傳回指定的預設值
-        /// </summary>
-        public static T2 GetValueOrDefault<T1, T2>(this Dictionary<T1, T2> dictionary, T1 key, T2 defaultValue = default(T2))
-        {
-            if (dictionary.ContainsKey(key))
-            {
-                return dictionary[key];
-            }
-            return defaultValue;
-        }
-
-        /// <summary>
         /// 從字串第 N 個字開始尋找第一個符合任一查詢字串的起始位置
         /// </summary>
         public static int IndexOfAny(this string sender, params string[] anyOf)
@@ -505,9 +509,9 @@ namespace HelpersForCore
         /// <summary>
         /// 取代換行字元
         /// </summary>
-        public static string ReplaceEndline(this string sender, string endline)
+        public static string ReplaceEndLine(this string sender, string endLine)
         {
-            return sender.Replace("\r\n", "\n").Replace("\n", endline);
+            return sender.Replace("\r\n", "\n").Replace("\n", endLine);
         }
 
         /// <summary>
@@ -654,26 +658,30 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 如果字串第一行是空白的則移除
+        /// 將字串起始的空白行全部刪除
         /// </summary>
-        public static string CutEmptyHead(this string sender)
+        public static string RemoneHeadEmptyLines(this string sender, int max = 0)
         {
             if (string.IsNullOrWhiteSpace(sender))
             {
                 return string.Empty;
             }
+            int removeNum = 0;
             int index = sender.IndexOf("\n");
             if (index >= 0)
             {
-                string head = sender.Left(index);
-                if (string.IsNullOrWhiteSpace(head))
+                string line = sender.Substring(0, index);
+                while (string.IsNullOrWhiteSpace(line) && index >= 0
+                    && (max == 0 || removeNum < max))
                 {
-                    return sender.Substring(index + 1);
+                    sender = sender.Substring(index + 1);
+                    index = sender.IndexOf("\n");
+                    if (index >= 0)
+                    {
+                        line = sender.Substring(0, index);
+                    }
+                    removeNum++;
                 }
-            }
-            if (string.IsNullOrWhiteSpace(sender))
-            {
-                return string.Empty;
             }
             return sender;
         }
@@ -681,7 +689,7 @@ namespace HelpersForCore
         /// <summary>
         /// 去除多行字串左邊起始共同長度的空白字元
         /// </summary>
-        public static string DecreaseIndentAllLines(this string sender, int max = 0)
+        public static string DecreaseIndent(this string sender, int max = 0)
         {
             IEnumerable<string> lines = sender.Replace("\t", "    ").Split('\n');
             int min = lines.Where(x => string.IsNullOrWhiteSpace(x) == false)
@@ -704,7 +712,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將一維陣列轉換成二維陣列
         /// </summary>
-        public static T[][] To2D<T>(this T[] arr, int size)
+        public static T[][] To2Dimension<T>(this T[] arr, int size)
         {
             int len = arr.Length / size + 1;
             T[][] result = new T[len][];
@@ -722,7 +730,7 @@ namespace HelpersForCore
         /// <summary>
         /// 如果指定的成員為 null, 則將成員以 new() 取得一個值
         /// </summary>
-        public static T1 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression) where T2: class, new()
+        public static T1 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression, Func<T2> newPropertyMethod = null) where T2: class, new()
         {
             MemberExpression memberExpression = null;
             if (expression.Body is UnaryExpression unaryExpression
@@ -743,7 +751,14 @@ namespace HelpersForCore
             T2 value = property.GetValue(sender) as T2;
             if (value == null)
             {
-                value = new T2();
+                if (newPropertyMethod == null)
+                {
+                    value = new T2();
+                }
+                else
+                {
+                    value = newPropertyMethod();
+                }
                 property.SetValue(sender, value);
             }
             return sender;
@@ -772,19 +787,87 @@ namespace HelpersForCore
             }
             return $"{url}?{queryString}";
         }
-
         /// <summary>
-        /// 判斷 Dictionary 是否有成員
+        /// 將 Dictionary 轉成 QueryString
         /// </summary>
-        public static bool NotNullAndAny<T1, T2>(this Dictionary<T1, T2> sender)
+        public static string ToQueryString(this Dictionary<string, JToken> dictionary)
         {
-            if (sender == null)
+            List<string> queries = new List<string>();
+            foreach (var query in dictionary)
             {
-                return false;
+                if (query.Value is JArray jArray)
+                {
+                    foreach (JToken jToken in jArray)
+                    {
+                        string value = HttpUtility.UrlEncode(Convert.ToString(jToken));
+                        queries.Add($"{query.Key}={value}");
+                    }
+                }
+                else
+                {
+                    string value = HttpUtility.UrlEncode(Convert.ToString(query.Value));
+                    queries.Add($"{query.Key}={value}");
+                }
             }
-            return sender.Any();
+            return string.Join("&", queries);
+        }
+        /// <summary>
+        /// 將 Dictionary 轉成 QueryString
+        /// </summary>
+        public static string ToQueryString<T>(this Dictionary<string, T> dictionary)
+        {
+            List<string> queries = new List<string>();
+            foreach (var query in dictionary)
+            {
+                string value = HttpUtility.UrlEncode(Convert.ToString(query.Value));
+                queries.Add($"{query.Key}={value}");
+            }
+            return string.Join("&", queries);
+        }
+        /// <summary>
+        /// 將 Dictionary 轉成 QueryString
+        /// </summary>
+        public static string ToQueryString<T>(this Dictionary<string, T[]> dictionary)
+        {
+            List<string> queries = new List<string>();
+            foreach (var query in dictionary)
+            {
+                foreach (var item in query.Value)
+                {
+                    string value = HttpUtility.UrlEncode(Convert.ToString(item));
+                    queries.Add($"{query.Key}={value}");
+                }
+            }
+            return string.Join("&", queries);
+        }
+        /// <summary>
+        /// 將 Dictionary 轉成 JObject
+        /// </summary>
+        public static JObject ToJObject(this Dictionary<string, JToken> dictionary, JObject request)
+        {
+            JObject jObject = new JObject();
+            foreach (var query in dictionary)
+            {
+                jObject.Add(query.Key, query.Value);
+            }
+            return jObject;
+        }
+        /// <summary>
+        /// 將 Dictionary 轉成 JObject
+        /// </summary>
+        public static JObject ToJObject<T>(this Dictionary<string, T> dictionary, JObject request)
+        {
+            JObject jObject = new JObject();
+            foreach (var query in dictionary)
+            {
+                jObject.Add(query.Key, JToken.FromObject(query.Value));
+            }
+            return jObject;
         }
 
+        /// <summary>
+        /// 將 Request.Query 轉成 JObject
+        /// </summary>
         public static JObject ToJObject(this IQueryCollection query)
         {
             JObject jObject = new JObject();
@@ -801,7 +884,9 @@ namespace HelpersForCore
             }
             return jObject;
         }
-
+        /// <summary>
+        /// 將 Request.Body 轉成 String
+        /// </summary>
         public static async Task<string> ToStringAsync(this Stream body, Encoding encoding = null)
         {
             body.Seek(0, SeekOrigin.Begin);
@@ -810,7 +895,9 @@ namespace HelpersForCore
                 return await reader.ReadToEndAsync();
             }
         }
-
+        /// <summary>
+        /// 將 Request.Body 轉成 JObject
+        /// </summary>
         public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
         {
             body.Seek(0, SeekOrigin.Begin);
@@ -820,8 +907,10 @@ namespace HelpersForCore
                 return JObject.Parse(json);
             }
         }
-
-        public static async Task<T> ToClassAsync<T>(this Stream body, Encoding encoding = null) where T : class, new()
+        /// <summary>
+        /// 將 Request.Body 轉成自訂的 Class
+        /// </summary>
+        public static async Task<T> ToObjectAsync<T>(this Stream body, Encoding encoding = null) where T : class, new()
         {
             body.Seek(0, SeekOrigin.Begin);
             using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))

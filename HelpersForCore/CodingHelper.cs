@@ -88,7 +88,7 @@ namespace HelpersForCore
                        AND o.NAME = @TableName 
                 ORDER  BY sc.colorder ",
                 new System.Data.SqlClient.SqlParameter("@TableName", tableName))
-                .Rows.ToModels<DbTableSchema.Field>();
+                .Rows.ToObjects<DbTableSchema.Field>();
             foreach (DbTableSchema.Field field in schema.Fields)
             {
                 field.TypeFullName = GetDbTypeFullName(field);

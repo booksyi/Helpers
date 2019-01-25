@@ -93,7 +93,7 @@ namespace HelpersForCore
         public static void ExecuteReaderEach<T>(this SqlCommand cmd, Action<T> func)
         {
             cmd.ExecuteReaderEach(dr => {
-                T model = dr.ToModel<T>();
+                T model = dr.ToObject<T>();
                 func(model);
             });
         }
@@ -182,7 +182,7 @@ namespace HelpersForCore
         public static async Task ExecuteReaderEachAsync<T>(this SqlCommand cmd, Action<T> func)
         {
             await cmd.ExecuteReaderEachAsync(dr => {
-                T model = dr.ToModel<T>();
+                T model = dr.ToObject<T>();
                 func(model);
             });
         }
