@@ -151,7 +151,7 @@ namespace HelpersForCore
         public new RequestFrom From { get; set; } = RequestFrom.HttpRequest;
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string TemplateUrl { get; set; }
+        public ApiNode TemplateNode { get; set; }
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public Dictionary<string, RequestNode> SimpleTemplateRequestNodes { get; set; }
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
@@ -173,13 +173,21 @@ namespace HelpersForCore
         }
     }
 
-    public class AdapterNode
+    public class ApiNode
     {
         public string Url { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public Dictionary<string, RequestSimpleNode> RequestNodes { get; set; }
-        public AdapterType Type { get; set; }
+    }
+
+    public class AdapterNode : ApiNode
+    {
         public AdapterHttpMethod HttpMethod { get; set; }
-        public string[] ResponseConfines { get; set; }
+        public AdapterType Type { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string ResponseConfine { get; set; }
     }
 
     [JsonConverter(typeof(StringEnumConverter))]

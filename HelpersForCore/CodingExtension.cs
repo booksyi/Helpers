@@ -121,7 +121,7 @@ namespace HelpersForCore
                                         .Where(x => x.ApplyKey == key)
                                         .Select(async node =>
                                         {
-                                            if (node.ApplyParameters.Any())
+                                            if (string.IsNullOrWhiteSpace(node.ApplyApi) == false)
                                             {
                                                 return await GenerateAsync(node);
                                             }
@@ -263,6 +263,22 @@ namespace HelpersForCore
             }
             return null;
         }
+
+        /// <summary>
+        /// 將 ApiNode 轉成 Url
+        /// </summary>
+        public static string ToUrl(this ApiNode node, JObject request)
+        {
+            string url = node.Url;
+            if (node.RequestNodes.NotNullAny())
+            {
+                string queryString = node.RequestNodes
+                    .ToDictionary(x => x.Key, x => x.Value.ToJToken(request))
+                    .ToQueryString();
+                url = url.AppendQueryString(queryString);
+            }
+            return url;
+        }
         /// <summary>
         /// 將 AdapterNode 轉成 JToken
         /// </summary>
@@ -291,19 +307,17 @@ namespace HelpersForCore
                         .ToJObject(request));
                 json = await response.Content.ReadAsStringAsync();
             }
-            try
+            JToken jToken = CSharpHelper.Try(() => JToken.Parse(json), x => x, () => json);
+            if (jToken is JObject jObject)
             {
-                return JToken.Parse(json);
+                return jObject.Confine(node.ResponseConfine);
             }
-            catch (Exception)
-            {
-                return json;
-            }
+            return jToken;
         }
         /// <summary>
         /// 將 RequestNode 轉成 IEnumerable&lt;GenerateNode&gt;
         /// </summary>
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodeAsync(this RequestNode requestNode, JObject request)
+        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this RequestNode requestNode, JObject request)
         {
             if (requestNode.AdapterNodes.NotNullAny())
             {
@@ -311,7 +325,7 @@ namespace HelpersForCore
                 var nodes = await requestNode.GenerateAdapters(request);
                 foreach (var node in nodes)
                 {
-                    generateNodes.AddRange(await node.ToGenerateNodeAsync(request));
+                    generateNodes.AddRange(await node.ToGenerateNodesAsync(request));
                 }
                 return generateNodes;
             }
@@ -398,7 +412,14 @@ namespace HelpersForCore
             else if (requestNode.From == RequestFrom.Template)
             {
                 GenerateNode generateNode = new GenerateNode();
-                generateNode.ApplyApi = requestNode.TemplateUrl;
+                if (requestNode.TemplateNode.RequestNodes?.Values != null)
+                {
+                    foreach (var adapterRequestNode in requestNode.TemplateNode.RequestNodes?.Values)
+                    {
+                        adapterRequestNode.Adapters = requestNode.Adapters;
+                    }
+                }
+                generateNode.ApplyApi = requestNode.TemplateNode.ToUrl(request);
                 if (requestNode.ComplexTemplateRequestNodes != null)
                 {
                     foreach (var key in requestNode.ComplexTemplateRequestNodes.Keys)
@@ -406,7 +427,7 @@ namespace HelpersForCore
                         var parameterNodes = requestNode.ComplexTemplateRequestNodes[key];
                         foreach (var node in parameterNodes)
                         {
-                            var children = await ToGenerateNodeAsync(node, request);
+                            var children = await ToGenerateNodesAsync(node, request);
                             foreach (var child in children)
                             {
                                 generateNode.AppendChild(child).ChangeKey(key);
@@ -417,6 +438,38 @@ namespace HelpersForCore
                 return new GenerateNode[] { generateNode };
             }
             return new GenerateNode[0];
+        }
+
+        /// <summary>
+        /// 將 JObject 限縮在指定成員
+        /// </summary>
+        public static JObject Confine(this JObject source, string propertyConfine)
+        {
+            if (string.IsNullOrWhiteSpace(propertyConfine) == false)
+            {
+                JObject confineObject = new JObject();
+                JProperty confineProperty = null;
+                JToken jToken = source;
+                string[] confines = propertyConfine.Split(".");
+                foreach (string confine in confines)
+                {
+                    if (jToken is JObject jObject)
+                    {
+                        var jProperty = jObject.Property(confine, StringComparison.CurrentCultureIgnoreCase);
+                        if (jProperty != null)
+                        {
+                            confineObject.Add(jProperty.Name, null);
+                            confineProperty = confineObject.Property(jProperty.Name, StringComparison.CurrentCultureIgnoreCase);
+                            jToken = jProperty.Value;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                confineProperty.Value = jToken;
+                return confineObject;
+            }
+            return source;
         }
 
         /// <summary>
@@ -441,26 +494,9 @@ namespace HelpersForCore
                         adapterRequestNode.Adapters = requestNode.Adapters;
                     }
                 }
-                JToken adapterValue = await adapterNode.ToJTokenAsync(request);
-                if (adapterValue is JObject jObject)
+                JToken adapterNodeValue = await adapterNode.ToJTokenAsync(request);
+                if (adapterNodeValue is JObject jObject)
                 {
-                    #region ResponseConfines
-                    if (adapterNode.ResponseConfines != null && adapterNode.ResponseConfines.Any())
-                    {
-                        string[] confines = adapterNode.ResponseConfines.Select(x => x.ToLower()).ToArray();
-                        string[] propertyNames = jObject
-                            .Properties()
-                            .Select(x => x.Name.ToLower())
-                            .Where(x => confines.Contains(x))
-                            .ToArray();
-                        foreach (string propertyName in propertyNames)
-                        {
-                            jObject
-                                .Property(propertyName, StringComparison.CurrentCultureIgnoreCase)
-                                .Remove();
-                        }
-                    }
-                    #endregion
                     if (adapterNode.Type == AdapterType.Unification)
                     {
                         requestNode.Adapters.Add(adapterNodeKey, jObject);
@@ -468,22 +504,32 @@ namespace HelpersForCore
                     }
                     else if (adapterNode.Type == AdapterType.Separation)
                     {
-                        if (jObject.Properties().Count() == 1 && jObject.Properties().First().Value is JArray jArray)
+                        JObject adapterObject = new JObject();
+                        JProperty adapterProperty = null;
+                        JToken jToken = jObject;
+                        while (jToken is JObject tokenObject && tokenObject.Properties().Count() == 1)
+                        {
+                            JProperty jProperty = tokenObject.Properties().First();
+                            adapterObject.Add(jProperty.Name, null);
+                            adapterProperty = adapterObject.Property(jProperty.Name, StringComparison.CurrentCultureIgnoreCase);
+                            jToken = jProperty.Value;
+                        }
+                        if (jToken is JArray jArray)
                         {
                             List<RequestNode> nodes = new List<RequestNode>();
                             foreach (var value in jArray)
                             {
-                                JObject jValue = new JObject();
-                                jValue.Add(jObject.Properties().First().Name, value);
+                                adapterProperty.Value = value;
+                                var cloneAdapterObject = JObject.Parse(adapterObject.ToString());
                                 var cloneRequestNode = requestNode.JsonConvertTo<RequestNode>();
-                                cloneRequestNode.Adapters.Add(adapterNodeKey, jValue);
+                                cloneRequestNode.Adapters.Add(adapterNodeKey, cloneAdapterObject);
                                 nodes.AddRange(await GenerateAdapters(cloneRequestNode, request));
                             }
                             return nodes;
                         }
                     }
                 }
-                else if (adapterValue is JArray values)
+                else if (adapterNodeValue is JArray values)
                 {
                     if (adapterNode.Type == AdapterType.Unification)
                     {
