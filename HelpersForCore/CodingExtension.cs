@@ -59,24 +59,25 @@ namespace HelpersForCore
             { "@@Space", " " },
             { "@@FullSpace", "　" },
             { "@@EndLine", "\r\n" },
-            { "@@Tab", "\t" }
+            { "@@Tab", "\t" },
+            { "@@At", "@" }
         };
 
         /// <summary>
         /// 以 GenerateNode 生成代碼
         /// </summary>
-        public static async Task<string> GenerateAsync(this GenerateNode root,
-            string paramLeft = "{{#",   // 參數起始的保留字
-            string paramRight = "}}",   // 參數結束的保留字
-            string eachSeparator = ",", // 參數設定分隔符的保留字
-            string withDefault = "|"    // 參數設定預設值的保留字
-        )
+        public static async Task<string> GenerateAsync(this GenerateNode root)
         {
             string result = await root.GetApplyTextAsync();
             if (string.IsNullOrWhiteSpace(result))
             {
                 return null;
             }
+
+            string paramLeft = root.Settings?.ParamLeft ?? "{{#";       // 參數起始的保留字
+            string paramRight = root.Settings?.ParamRight ?? "}}";      // 參數結束的保留字
+            string eachSeparator = root.Settings?.EachSeparator ?? ","; // 參數設定分隔符的保留字
+            string withDefault = root.Settings?.WithDefault ?? "|";     // 參數設定預設值的保留字
 
             int searchIndex = 0;
             int paramStartIndex = result.IndexOf(paramLeft);
@@ -229,7 +230,16 @@ namespace HelpersForCore
         {
             if (node.From == RequestSimpleFrom.HttpRequest)
             {
-                return request?.Property(node.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                string[] keys = node.HttpRequestKey.Split('|').Select(x => x.Trim()).ToArray();
+                foreach (string key in keys)
+                {
+                    JToken jToken = request?.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    if (string.IsNullOrWhiteSpace(Convert.ToString(jToken)) == false)
+                    {
+                        return jToken;
+                    }
+                }
+                return null;
             }
             else if (node.From == RequestSimpleFrom.Value)
             {
@@ -336,34 +346,49 @@ namespace HelpersForCore
             if (requestNode.From == RequestFrom.HttpRequest)
             {
                 List<GenerateNode> generateNodes = new List<GenerateNode>();
-                var jToken = request.Property(requestNode.HttpRequestKey, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                JToken jToken = null;
+                string[] keys = requestNode.HttpRequestKey.Split('|').Select(x => x.Trim()).ToArray();
+                foreach (string key in keys)
+                {
+                    JToken propertyToken = request.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    if (string.IsNullOrWhiteSpace(Convert.ToString(propertyToken)) == false)
+                    {
+                        jToken = propertyToken;
+                        break;
+                    }
+                }
                 if (jToken is JValue jValue)
                 {
-                    generateNodes.Add(new GenerateNode(
-                        requestNode.HttpRequestKey,
-                        Convert.ToString(jValue)));
+                    generateNodes.Add(new GenerateNode()
+                    {
+                        ApplyValue = Convert.ToString(jValue)
+                    });
                 }
                 else if (jToken is JObject jObject)
                 {
-                    generateNodes.Add(new GenerateNode(
-                        requestNode.HttpRequestKey,
-                        Convert.ToString(jObject)));
+                    generateNodes.Add(new GenerateNode()
+                    {
+                        ApplyValue = Convert.ToString(jObject)
+                    });
                 }
                 else if (jToken is JArray jArray)
                 {
-                    foreach (var value in jArray)
+                    foreach (JToken arrayToken in jArray)
                     {
-                        generateNodes.Add(new GenerateNode(
-                            requestNode.HttpRequestKey,
-                            Convert.ToString(value)));
+                        generateNodes.Add(new GenerateNode()
+                        {
+                            ApplyValue = Convert.ToString(arrayToken)
+                        });
                     }
                 }
                 return generateNodes;
             }
             else if (requestNode.From == RequestFrom.Value)
             {
-                GenerateNode generateNode = new GenerateNode();
-                generateNode.ApplyValue = requestNode.Value;
+                GenerateNode generateNode = new GenerateNode
+                {
+                    ApplyValue = requestNode.Value
+                };
                 return new GenerateNode[] { generateNode };
             }
             else if (requestNode.From == RequestFrom.Adapter)
@@ -386,23 +411,26 @@ namespace HelpersForCore
                     {
                         if (jToken is JValue jValue)
                         {
-                            generateNodes.Add(new GenerateNode(
-                                requestNode.AdapterPropertyName,
-                                Convert.ToString(jValue)));
+                            generateNodes.Add(new GenerateNode()
+                            {
+                                ApplyValue = Convert.ToString(jValue)
+                            });
                         }
                         else if (jToken is JObject jObject)
                         {
-                            generateNodes.Add(new GenerateNode(
-                                requestNode.AdapterPropertyName,
-                                Convert.ToString(jObject)));
+                            generateNodes.Add(new GenerateNode()
+                            {
+                                ApplyValue = Convert.ToString(jObject)
+                            });
                         }
                         else if (jToken is JArray jArray)
                         {
-                            foreach (var value in jArray)
+                            foreach (JToken arrayToken in jArray)
                             {
-                                generateNodes.Add(new GenerateNode(
-                                    requestNode.AdapterPropertyName,
-                                    Convert.ToString(value)));
+                                generateNodes.Add(new GenerateNode()
+                                {
+                                    ApplyValue = Convert.ToString(arrayToken)
+                                });
                             }
                         }
                     }
@@ -517,9 +545,9 @@ namespace HelpersForCore
                         if (jToken is JArray jArray)
                         {
                             List<RequestNode> nodes = new List<RequestNode>();
-                            foreach (var value in jArray)
+                            foreach (JToken arrayToken in jArray)
                             {
-                                adapterProperty.Value = value;
+                                adapterProperty.Value = arrayToken;
                                 var cloneAdapterObject = JObject.Parse(adapterObject.ToString());
                                 var cloneRequestNode = requestNode.JsonConvertTo<RequestNode>();
                                 cloneRequestNode.Adapters.Add(adapterNodeKey, cloneAdapterObject);
@@ -529,25 +557,25 @@ namespace HelpersForCore
                         }
                     }
                 }
-                else if (adapterNodeValue is JArray values)
+                else if (adapterNodeValue is JArray jArray)
                 {
                     if (adapterNode.Type == AdapterType.Unification)
                     {
-                        JArray jArray = new JArray();
-                        foreach (JToken value in values)
+                        JArray adapterArray = new JArray();
+                        foreach (JToken arrayToken in jArray)
                         {
-                            jArray.Add(value);
+                            adapterArray.Add(arrayToken);
                         }
-                        requestNode.Adapters.Add(adapterNodeKey, jArray);
+                        requestNode.Adapters.Add(adapterNodeKey, adapterArray);
                         return await GenerateAdapters(requestNode, request);
                     }
                     else if (adapterNode.Type == AdapterType.Separation)
                     {
                         List<RequestNode> nodes = new List<RequestNode>();
-                        foreach (var value in values)
+                        foreach (JToken arrayToken in jArray)
                         {
                             var cloneRequestNode = requestNode.JsonConvertTo<RequestNode>();
-                            cloneRequestNode.Adapters.Add(adapterNodeKey, value);
+                            cloneRequestNode.Adapters.Add(adapterNodeKey, arrayToken);
                             nodes.AddRange(await GenerateAdapters(cloneRequestNode, request));
                         }
                         return nodes;
@@ -584,6 +612,80 @@ namespace HelpersForCore
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// 取得 RequestNode 所有用到的樣板 API URL
+        /// </summary>
+        public static string[] GetAllTemplates(this RequestNode requestNode)
+        {
+            List<string> templates = new List<string>();
+            if (requestNode.From == RequestFrom.Template)
+            {
+                templates.Add(requestNode.TemplateNode.Url);
+                if (requestNode.SimpleTemplateRequestNodes.NotNullAny())
+                {
+                    templates.AddRange(
+                        requestNode
+                            .SimpleTemplateRequestNodes
+                            .Values
+                            .SelectMany(x => x.GetAllTemplates()));
+                }
+            }
+            return templates.Distinct().ToArray();
+        }
+
+        /// <summary>
+        /// 取得 RequestNode 所有用到 Input 的 Key
+        /// </summary>
+        public static Dictionary<string, string[]> GetAllRequestKeys(this RequestNode requestNode)
+        {
+            if (requestNode.From == RequestFrom.HttpRequest)
+            {
+                if (string.IsNullOrWhiteSpace(requestNode.HttpRequestDescription))
+                {
+                    return new Dictionary<string, string[]>() { {
+                        requestNode.HttpRequestKey,
+                        new string[0] } };
+                }
+                return new Dictionary<string, string[]>() { {
+                    requestNode.HttpRequestKey,
+                    new string[] { requestNode.HttpRequestDescription } } };
+            }
+            else if (requestNode.From == RequestFrom.Template)
+            {
+                List<KeyValuePair<string, string[]>> items = new List<KeyValuePair<string, string[]>>();
+                if (requestNode.AdapterNodes.NotNullAny())
+                {
+                    items.AddRange(requestNode
+                        .AdapterNodes
+                        .Values
+                        .Where(x => x.RequestNodes.NotNullAny())
+                        .SelectMany(x => x.RequestNodes
+                            .Values
+                            .Where(y => y.From == RequestSimpleFrom.HttpRequest)
+                            .Select(y => (Key: y.HttpRequestKey, Description: y.HttpRequestDescription)))
+                        .GroupBy(x => x.Key)
+                        .Select(x => new KeyValuePair<string, string[]>(
+                            x.Key,
+                            x.Select(y => y.Description)
+                                .Where(y => string.IsNullOrWhiteSpace(y) == false)
+                                .Distinct()
+                                .ToArray())));
+                }
+                if (requestNode.SimpleTemplateRequestNodes.NotNullAny())
+                {
+                    items.AddRange(requestNode
+                        .SimpleTemplateRequestNodes
+                        .Values
+                        .SelectMany(x => x.GetAllRequestKeys()));
+                }
+                return items
+                    .GroupBy(x => x.Key)
+                    .Select(x => new KeyValuePair<string, string[]>(x.Key, x.SelectMany(y => y.Value).Distinct().ToArray()))
+                    .ToDictionary(x => x.Key, x => x.Value);
+            }
+            return new Dictionary<string, string[]>();
         }
     }
 }

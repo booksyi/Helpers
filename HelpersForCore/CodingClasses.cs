@@ -69,6 +69,9 @@ namespace HelpersForCore
         public List<GenerateNode> ApplyParameters { get; private set; } = new List<GenerateNode>();
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public GenerateNodeSettings Settings { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string ApplyExceptionMessage { get; set; }
 
         /// <summary>
@@ -90,7 +93,7 @@ namespace HelpersForCore
                 }
                 else
                 {
-                    ApplyExceptionMessage = $"HttpGet {ApplyApi} Failed.";
+                    ApplyExceptionMessage = $"HttpGet {ApplyApi} Failed ({message.StatusCode}).";
                     return null;
                 }
             }
@@ -115,12 +118,37 @@ namespace HelpersForCore
         }
     }
 
+    public class GenerateNodeSettings
+    {
+        /// <summary>
+        /// 參數起始的保留字
+        /// </summary>
+        public string ParamLeft { get; set; }
+
+        /// <summary>
+        /// 參數結束的保留字
+        /// </summary>
+        public string ParamRight { get; set; }
+
+        /// <summary>
+        /// 參數設定分隔符的保留字
+        /// </summary>
+        public string EachSeparator { get; set; }
+
+        /// <summary>
+        /// 參數設定預設值的保留字
+        /// </summary>
+        public string WithDefault { get; set; }
+    }
+
     public class RequestSimpleNode
     {
         public RequestSimpleFrom From { get; set; } = RequestSimpleFrom.HttpRequest;
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string HttpRequestKey { get; set; }
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string HttpRequestDescription { get; set; }
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public string Value { get; set; }
@@ -176,6 +204,9 @@ namespace HelpersForCore
     public class ApiNode
     {
         public string Url { get; set; }
+
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string Description { get; set; }
 
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public Dictionary<string, RequestSimpleNode> RequestNodes { get; set; }
