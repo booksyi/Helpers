@@ -141,141 +141,297 @@ namespace HelpersForCore
         public string WithDefault { get; set; }
     }
 
-    public class RequestSimpleNode
+    public class CodeTemplate
     {
-        public RequestSimpleFrom From { get; set; } = RequestSimpleFrom.HttpRequest;
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string HttpRequestKey { get; set; }
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string HttpRequestDescription { get; set; }
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string Value { get; set; }
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string AdapterName { get; set; }
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string AdapterPropertyName { get; set; }
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public Dictionary<string, JToken> Adapters { get; set; }
-
-        public RequestSimpleNode() { }
-        public RequestSimpleNode(string key)
+        public class RequestNode
         {
-            HttpRequestKey = key;
+            public string Name { get; set; }
+            public RequestFrom From { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputProperty { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string HttpRequestDescription { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Value { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterProperty { get; set; }
+
+            public RequestNode() { }
+            public RequestNode(string name)
+            {
+                Name = name;
+            }
+
+            public RequestNode FromValue(string value)
+            {
+                From = RequestFrom.Value;
+                Value = value;
+                return this;
+            }
+
+            public RequestNode FromInput(string inputName, string inputProperty = null)
+            {
+                From = RequestFrom.Input;
+                InputName = inputName;
+                InputProperty = inputProperty;
+                return this;
+            }
+
+            public RequestNode FromAdapter(string adapterName, string adapterProperty = null)
+            {
+                From = RequestFrom.Adapter;
+                AdapterName = adapterName;
+                AdapterProperty = adapterProperty;
+                return this;
+            }
         }
-        public RequestSimpleNode(string adapter, string property)
+
+        public class ParameterNode
         {
-            From = RequestSimpleFrom.Adapter;
-            AdapterName = adapter;
-            AdapterPropertyName = property;
+            public string Name { get; set; }
+            public ParameterFrom From { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Value { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputProperty { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string HttpRequestDescription { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterProperty { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public TemplateNode TemplateNode { get; set; }
+
+            public ParameterNode() { }
+            public ParameterNode(string name)
+            {
+                Name = name;
+            }
+
+            public ParameterNode FromValue(string value)
+            {
+                From = ParameterFrom.Value;
+                Value = value;
+                return this;
+            }
+
+            public ParameterNode FromInput(string inputName, string inputProperty = null)
+            {
+                From = ParameterFrom.Input;
+                InputName = inputName;
+                InputProperty = inputProperty;
+                return this;
+            }
+
+            public ParameterNode FromAdapter(string adapterName, string adapterProperty = null)
+            {
+                From = ParameterFrom.Adapter;
+                AdapterName = adapterName;
+                AdapterProperty = adapterProperty;
+                return this;
+            }
+            
+            public ParameterNode FromTemplate(TemplateNode template)
+            {
+                From = ParameterFrom.Template;
+                TemplateNode = template;
+                return this;
+            }
         }
-    }
 
-    public class RequestNode : RequestSimpleNode
-    {
-        public new RequestFrom From { get; set; } = RequestFrom.HttpRequest;
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public ApiNode TemplateNode { get; set; }
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public Dictionary<string, RequestNode> SimpleTemplateRequestNodes { get; set; }
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public Dictionary<string, IEnumerable<RequestNode>> ComplexTemplateRequestNodes { get; set; }
-
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public Dictionary<string, AdapterNode> AdapterNodes { get; set; }
-
-        public RequestNode() { }
-        public RequestNode(string key)
+        public class AdapterNode
         {
-            HttpRequestKey = key;
+            public string Name { get; set; }
+
+            public HttpMethod HttpMethod { get; set; }
+            public string Url { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public IEnumerable<RequestNode> RequestNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string ResponseConfine { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool ResponseSplit { get; set; }
+
+            public AdapterNode() { }
+            public AdapterNode(string name, string url, HttpMethod httpMethod = HttpMethod.Get)
+            {
+                Name = name;
+                Url = url;
+                HttpMethod = httpMethod;
+            }
         }
-        public RequestNode(string adapter, string property)
+
+        public class TemplateNode
         {
-            From = RequestFrom.Adapter;
-            AdapterName = adapter;
-            AdapterPropertyName = property;
+            public string Url { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public RequestNode[] RequestNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public AdapterNode[] AdapterNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public ParameterNode[] ParameterNodes { get; set; }
+
+            public TemplateNode() { }
+            public TemplateNode(string url)
+            {
+                Url = url;
+            }
         }
-    }
 
-    public class ApiNode
-    {
-        public string Url { get; set; }
+        #region Transaction
+        public class TransactionRequestNode
+        {
+            public string Name { get; set; }
+            public RequestFrom From { get; set; }
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string Description { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputProperty { get; set; }
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public Dictionary<string, RequestSimpleNode> RequestNodes { get; set; }
-    }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string HttpRequestDescription { get; set; }
 
-    public class AdapterNode : ApiNode
-    {
-        public AdapterHttpMethod HttpMethod { get; set; }
-        public AdapterType Type { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Value { get; set; }
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string ResponseConfine { get; set; }
-    }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterProperty { get; set; }
 
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum RequestSimpleFrom
-    {
-        /// <summary>
-        /// 請求
-        /// </summary>
-        HttpRequest,
-        /// <summary>
-        /// 固定值
-        /// </summary>
-        Value,
-        /// <summary>
-        /// 中繼資料
-        /// </summary>
-        Adapter
-    }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public Dictionary<string, JToken> Adapters { get; set; }
+        }
 
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum RequestFrom
-    {
-        /// <summary>
-        /// 請求
-        /// </summary>
-        HttpRequest,
-        /// <summary>
-        /// 固定值
-        /// </summary>
-        Value,
-        /// <summary>
-        /// 中繼資料
-        /// </summary>
-        Adapter,
-        /// <summary>
-        /// 樣板
-        /// </summary>
-        Template
-    }
+        public class TransactionParameterNode
+        {
+            public string Name { get; set; }
+            public ParameterFrom From { get; set; }
 
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum AdapterType
-    {
-        /// <summary>
-        /// 統一
-        /// </summary>
-        Unification,
-        /// <summary>
-        /// 分離
-        /// </summary>
-        Separation
-    }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Value { get; set; }
 
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum AdapterHttpMethod
-    {
-        Get,
-        Post
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string InputProperty { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string HttpRequestDescription { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterName { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string AdapterProperty { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public TransactionTemplateNode TemplateNode { get; set; }
+        }
+
+        public class TransactionAdapterNode
+        {
+            public string Name { get; set; }
+
+            public HttpMethod HttpMethod { get; set; }
+            public string Url { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public IEnumerable<TransactionRequestNode> RequestNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string ResponseConfine { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool ResponseSplit { get; set; }
+        }
+
+        public class TransactionTemplateNode
+        {
+            public string Url { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public TransactionRequestNode[] RequestNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public TransactionAdapterNode[] AdapterNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public TransactionParameterNode[] ParameterNodes { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public Dictionary<string, JToken> Adapters { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public List<TransactionParameterNode> ComplexTemplateRequestNodes { get; set; }
+        }
+        #endregion
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public enum RequestFrom
+        {
+            /// <summary>
+            /// 固定值
+            /// </summary>
+            Value,
+            /// <summary>
+            /// 輸入參數
+            /// </summary>
+            Input,
+            /// <summary>
+            /// 中繼資料
+            /// </summary>
+            Adapter
+        }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public enum ParameterFrom
+        {
+            /// <summary>
+            /// 固定值
+            /// </summary>
+            Value,
+            /// <summary>
+            /// 輸入參數
+            /// </summary>
+            Input,
+            /// <summary>
+            /// 中繼資料
+            /// </summary>
+            Adapter,
+            /// <summary>
+            /// 樣板
+            /// </summary>
+            Template
+        }
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public enum HttpMethod
+        {
+            Get,
+            Post
+        }
     }
 }
