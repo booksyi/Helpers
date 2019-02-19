@@ -143,6 +143,34 @@ namespace HelpersForCore
 
     public class CodeTemplate
     {
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public Input[] Inputs { get; set; }
+
+        public TemplateNode[] TemplateNodes { get; set; }
+
+        public class Input
+        {
+            public string Name { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string DefaultValue { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Description { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool IsJson { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool Split { get; set; }
+
+            public Input() { }
+            public Input(string name)
+            {
+                Name = name;
+            }
+        }
+
         public class RequestNode
         {
             public string Name { get; set; }
@@ -263,7 +291,7 @@ namespace HelpersForCore
             public string Url { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public IEnumerable<RequestNode> RequestNodes { get; set; }
+            public RequestNode[] RequestNodes { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string ResponseConfine { get; set; }
@@ -300,7 +328,7 @@ namespace HelpersForCore
             }
         }
 
-        #region Transaction
+        #region Transaction Classes
         public class TransactionRequestNode
         {
             public string Name { get; set; }
@@ -359,7 +387,7 @@ namespace HelpersForCore
             public string Url { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public IEnumerable<TransactionRequestNode> RequestNodes { get; set; }
+            public TransactionRequestNode[] RequestNodes { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string ResponseConfine { get; set; }
@@ -385,7 +413,7 @@ namespace HelpersForCore
             public Dictionary<string, JToken> Adapters { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public List<TransactionParameterNode> ComplexTemplateRequestNodes { get; set; }
+            public TransactionParameterNode[] TransactionParameterNodes { get; set; }
         }
         #endregion
 

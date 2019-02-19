@@ -224,11 +224,15 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 將 CodeTemplate.RequestSimpleNode 轉成 JToken
+        /// 將 RequestNode 轉成 JToken
         /// </summary>
         public static JToken ToJToken(this CodeTemplate.TransactionRequestNode node, JObject request)
         {
-            if (node.From == CodeTemplate.RequestFrom.Input)
+            if (node.From == CodeTemplate.RequestFrom.Value)
+            {
+                return node.Value;
+            }
+            else if (node.From == CodeTemplate.RequestFrom.Input)
             {
                 string[] keys = node.InputName.Split('|').Select(x => x.Trim()).ToArray();
                 foreach (string key in keys)
@@ -240,10 +244,6 @@ namespace HelpersForCore
                     }
                 }
                 return null;
-            }
-            else if (node.From == CodeTemplate.RequestFrom.Value)
-            {
-                return node.Value;
             }
             else if (node.From == CodeTemplate.RequestFrom.Adapter)
             {
@@ -275,7 +275,7 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 將 ApiNode 轉成 Url
+        /// 將 TemplateNode 轉成 Url
         /// </summary>
         public static string ToUrl(this CodeTemplate.TransactionTemplateNode node, JObject request)
         {
@@ -325,35 +325,108 @@ namespace HelpersForCore
             return jToken;
         }
 
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate.ParameterNode requestNode, JObject request)
+        public static async Task<JToken> ToJTokenAsync(this CodeTemplate.TransactionParameterNode node, JObject request)
         {
-            return await requestNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>().ToGenerateNodesAsync(request);
-        }
-        
-        /// <summary>
-        /// 將 RequestNode 轉成 IEnumerable&lt;GenerateNode&gt;
-        /// </summary>
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate.TransactionParameterNode requestNode, JObject request)
-        {
-            if (requestNode.TemplateNode.AdapterNodes.NotNullAny())
+            if (node.From == CodeTemplate.ParameterFrom.Value)
             {
-                List<GenerateNode> generateNodes = new List<GenerateNode>();
-                var nodes = await requestNode.GenerateAdapters(request);
-                foreach (var node in nodes)
+                return node.Value;
+            }
+            else if (node.From == CodeTemplate.ParameterFrom.Input)
+            {
+                JToken jToken = null;
+                string[] keys = node.InputName.Split('|').Select(x => x.Trim()).ToArray();
+                foreach (string key in keys)
                 {
-                    generateNodes.AddRange(await node.ToGenerateNodesAsync(request));
+                    JToken propertyToken = request.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    if (string.IsNullOrWhiteSpace(Convert.ToString(propertyToken)) == false)
+                    {
+                        jToken = propertyToken;
+                        break;
+                    }
                 }
-                return generateNodes;
+                return jToken;
             }
-            if (requestNode.TemplateNode.ParameterNodes.NotNullAny())
+            else if (node.From == CodeTemplate.ParameterFrom.Adapter)
             {
-                await GenerateComplex(requestNode, request);
+                if (node.TemplateNode.Adapters != null
+                    && node.TemplateNode.Adapters.Any()
+                    && node.TemplateNode.Adapters.ContainsKey(node.AdapterName))
+                {
+                    string[] propertyNames = node.AdapterProperty?.Split('.');
+                    JToken jToken = node.TemplateNode.Adapters[node.AdapterName];
+                    if (jToken is JObject && propertyNames != null && propertyNames.Any())
+                    {
+                        foreach (var propertyName in propertyNames)
+                        {
+                            jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                        }
+                    }
+                    return jToken;
+                }
+                return null;
             }
-            if (requestNode.From == CodeTemplate.ParameterFrom.Input)
+            else if (node.From == CodeTemplate.ParameterFrom.Template)
+            {
+                JArray jArray = new JArray();
+                if (node.TemplateNode.TransactionParameterNodes != null)
+                {
+                    foreach (var key in node.TemplateNode.TransactionParameterNodes.Select(x => x.Name).Distinct())
+                    {
+                        var parameterNodes = node.TemplateNode.TransactionParameterNodes.Where(x => x.Name == key);
+                        foreach (var parameterNode in parameterNodes)
+                        {
+                            JToken jToken = await parameterNode.ToJTokenAsync(request);
+                            jArray.Add(jToken);
+                        }
+                    }
+                }
+                return jArray;
+            }
+            return null;
+        }
+
+        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate template, JObject request)
+        {
+            List<GenerateNode> nodes = new List<GenerateNode>();
+            foreach (var templateNode in template.TemplateNodes)
+            {
+                nodes.AddRange(await templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>().ToGenerateNodesAsync(request));
+            }
+            return nodes;
+        }
+
+        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
+        {
+            GenerateNode generateNode = new GenerateNode();
+            generateNode.ApplyApi = templateNode.ToUrl(request);
+            foreach (var parameterNode in templateNode.ParameterNodes)
+            {
+                JToken jToken = await parameterNode.ToJTokenAsync(request);
+                if (jToken is JArray jArray)
+                {
+                    foreach (var arrayToken in jArray)
+                    {
+                        generateNode.AppendChild(parameterNode.Name, Convert.ToString(arrayToken));
+                    }
+                }
+                else
+                {
+                    generateNode.AppendChild(parameterNode.Name, Convert.ToString(jToken));
+                }
+            }
+            return new GenerateNode[] { generateNode };
+        }
+
+        /// <summary>
+        /// 將 ParameterNode 轉成 IEnumerable&lt;GenerateNode&gt;
+        /// </summary>
+        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsyncXXX(this CodeTemplate.TransactionParameterNode parameterNode, JObject request)
+        {
+            if (parameterNode.From == CodeTemplate.ParameterFrom.Input)
             {
                 List<GenerateNode> generateNodes = new List<GenerateNode>();
                 JToken jToken = null;
-                string[] keys = requestNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
+                string[] keys = parameterNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
                 foreach (string key in keys)
                 {
                     JToken propertyToken = request.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
@@ -389,23 +462,23 @@ namespace HelpersForCore
                 }
                 return generateNodes;
             }
-            else if (requestNode.From == CodeTemplate.ParameterFrom.Value)
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Value)
             {
                 GenerateNode generateNode = new GenerateNode
                 {
-                    ApplyValue = requestNode.Value
+                    ApplyValue = parameterNode.Value
                 };
                 return new GenerateNode[] { generateNode };
             }
-            else if (requestNode.From == CodeTemplate.ParameterFrom.Adapter)
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Adapter)
             {
                 List<GenerateNode> generateNodes = new List<GenerateNode>();
-                if (requestNode.TemplateNode.Adapters != null
-                    && requestNode.TemplateNode.Adapters.Any()
-                    && requestNode.TemplateNode.Adapters.ContainsKey(requestNode.AdapterName))
+                if (parameterNode.TemplateNode.Adapters != null
+                    && parameterNode.TemplateNode.Adapters.Any()
+                    && parameterNode.TemplateNode.Adapters.ContainsKey(parameterNode.AdapterName))
                 {
-                    string[] propertyNames = requestNode.AdapterProperty?.Split('.');
-                    JToken jToken = requestNode.TemplateNode.Adapters[requestNode.AdapterName];
+                    string[] propertyNames = parameterNode.AdapterProperty?.Split('.');
+                    JToken jToken = parameterNode.TemplateNode.Adapters[parameterNode.AdapterName];
                     if (jToken is JObject && propertyNames != null && propertyNames.Any())
                     {
                         foreach (var propertyName in propertyNames)
@@ -443,25 +516,41 @@ namespace HelpersForCore
                 }
                 return generateNodes;
             }
-            else if (requestNode.From == CodeTemplate.ParameterFrom.Template)
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
             {
-                GenerateNode generateNode = new GenerateNode();
-                if (requestNode.TemplateNode.RequestNodes.NotNullAny())
+                if (parameterNode.TemplateNode.AdapterNodes.NotNullAny())
                 {
-                    foreach (var adapterRequestNode in requestNode.TemplateNode.RequestNodes)
+                    List<GenerateNode> generateNodes = new List<GenerateNode>();
+                    var nodes = await parameterNode.GenerateAdapters(request);
+                    foreach (var node in nodes)
                     {
-                        adapterRequestNode.Adapters = requestNode.TemplateNode.Adapters;
+                        generateNodes.AddRange(await node.ToGenerateNodesAsyncXXX(request));
+                    }
+                    return generateNodes;
+                }
+                if (parameterNode.TemplateNode.ParameterNodes.NotNullAny())
+                {
+                    await GenerateComplex(parameterNode, request);
+                }
+
+
+                GenerateNode generateNode = new GenerateNode();
+                if (parameterNode.TemplateNode.RequestNodes.NotNullAny())
+                {
+                    foreach (var adapterRequestNode in parameterNode.TemplateNode.RequestNodes)
+                    {
+                        adapterRequestNode.Adapters = parameterNode.TemplateNode.Adapters;
                     }
                 }
-                generateNode.ApplyApi = requestNode.TemplateNode.ToUrl(request);
-                if (requestNode.TemplateNode.ComplexTemplateRequestNodes != null)
+                generateNode.ApplyApi = parameterNode.TemplateNode.ToUrl(request);
+                if (parameterNode.TemplateNode.TransactionParameterNodes != null)
                 {
-                    foreach (var key in requestNode.TemplateNode.ComplexTemplateRequestNodes.Select(x => x.Name).Distinct())
+                    foreach (var key in parameterNode.TemplateNode.TransactionParameterNodes.Select(x => x.Name).Distinct())
                     {
-                        var parameterNodes = requestNode.TemplateNode.ComplexTemplateRequestNodes.Where(x => x.Name == key);
+                        var parameterNodes = parameterNode.TemplateNode.TransactionParameterNodes.Where(x => x.Name == key);
                         foreach (var node in parameterNodes)
                         {
-                            var children = await ToGenerateNodesAsync(node, request);
+                            var children = await ToGenerateNodesAsyncXXX(node, request);
                             foreach (var child in children)
                             {
                                 generateNode.AppendChild(child).ChangeKey(key);
@@ -507,25 +596,25 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 依照 RequestNode.AdapterNodes 生成 RequestNode.Adapters
+        /// 依照 ParameterNode.AdapterNodes 生成 ParameterNode.Adapters
         /// </summary>
-        public static async Task<IEnumerable<CodeTemplate.TransactionParameterNode>> GenerateAdapters(this CodeTemplate.TransactionParameterNode requestNode, JObject request)
+        public static async Task<IEnumerable<CodeTemplate.TransactionParameterNode>> GenerateAdapters(this CodeTemplate.TransactionParameterNode parameterNode, JObject request)
         {
-            if (requestNode.TemplateNode != null
-                && requestNode.TemplateNode.AdapterNodes.NotNullAny())
+            if (parameterNode.TemplateNode != null
+                && parameterNode.TemplateNode.AdapterNodes.NotNullAny())
             {
-                if (requestNode.TemplateNode.Adapters == null)
+                if (parameterNode.TemplateNode.Adapters == null)
                 {
-                    requestNode.TemplateNode.Adapters = new Dictionary<string, JToken>();
+                    parameterNode.TemplateNode.Adapters = new Dictionary<string, JToken>();
                 }
-                string adapterNodeKey = requestNode.TemplateNode.AdapterNodes.First().Name;
-                var adapterNode = requestNode.TemplateNode.AdapterNodes.FirstOrDefault(x => x.Name == adapterNodeKey);
-                requestNode.TemplateNode.AdapterNodes = requestNode.TemplateNode.AdapterNodes.Where(x => x.Name != adapterNodeKey).ToArray();
+                string adapterNodeKey = parameterNode.TemplateNode.AdapterNodes.First().Name;
+                var adapterNode = parameterNode.TemplateNode.AdapterNodes.FirstOrDefault(x => x.Name == adapterNodeKey);
+                parameterNode.TemplateNode.AdapterNodes = parameterNode.TemplateNode.AdapterNodes.Where(x => x.Name != adapterNodeKey).ToArray();
                 if (adapterNode.RequestNodes.NotNullAny())
                 {
                     foreach (var adapterRequestNode in adapterNode.RequestNodes)
                     {
-                        adapterRequestNode.Adapters = requestNode.TemplateNode.Adapters;
+                        adapterRequestNode.Adapters = parameterNode.TemplateNode.Adapters;
                     }
                 }
                 JToken adapterNodeValue = await adapterNode.ToJTokenAsync(request);
@@ -550,7 +639,7 @@ namespace HelpersForCore
                             {
                                 adapterProperty.Value = arrayToken;
                                 var cloneAdapterObject = JObject.Parse(adapterObject.ToString());
-                                var cloneRequestNode = requestNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>();
+                                var cloneRequestNode = parameterNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>();
                                 cloneRequestNode.TemplateNode.Adapters.Add(adapterNodeKey, cloneAdapterObject);
                                 nodes.AddRange(await GenerateAdapters(cloneRequestNode, request));
                             }
@@ -559,8 +648,8 @@ namespace HelpersForCore
                     }
                     else
                     {
-                        requestNode.TemplateNode.Adapters.Add(adapterNodeKey, jObject);
-                        return await GenerateAdapters(requestNode, request);
+                        parameterNode.TemplateNode.Adapters.Add(adapterNodeKey, jObject);
+                        return await GenerateAdapters(parameterNode, request);
                     }
                 }
                 else if (adapterNodeValue is JArray jArray)
@@ -570,7 +659,7 @@ namespace HelpersForCore
                         List<CodeTemplate.TransactionParameterNode> nodes = new List<CodeTemplate.TransactionParameterNode>();
                         foreach (JToken arrayToken in jArray)
                         {
-                            var cloneRequestNode = requestNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>();
+                            var cloneRequestNode = parameterNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>();
                             cloneRequestNode.TemplateNode.Adapters.Add(adapterNodeKey, arrayToken);
                             nodes.AddRange(await GenerateAdapters(cloneRequestNode, request));
                         }
@@ -583,12 +672,12 @@ namespace HelpersForCore
                         {
                             adapterArray.Add(arrayToken);
                         }
-                        requestNode.TemplateNode.Adapters.Add(adapterNodeKey, adapterArray);
-                        return await GenerateAdapters(requestNode, request);
+                        parameterNode.TemplateNode.Adapters.Add(adapterNodeKey, adapterArray);
+                        return await GenerateAdapters(parameterNode, request);
                     }
                 }
             }
-            return new CodeTemplate.TransactionParameterNode[] { requestNode };
+            return new CodeTemplate.TransactionParameterNode[] { parameterNode };
         }
         /// <summary>
         /// 依照 RequestNode.SimpleTemplateRequestNodes 生成 RequestNode.ComplexTemplateRequestNodes
@@ -599,7 +688,7 @@ namespace HelpersForCore
                 && requestNode.TemplateNode.ParameterNodes.Any())
             {
                 string[] keys = requestNode.TemplateNode.ParameterNodes.Select(x => x.Name).ToArray();
-                requestNode.TemplateNode.ComplexTemplateRequestNodes = new List<CodeTemplate.TransactionParameterNode>();
+                var transactionParameterNodes = new List<CodeTemplate.TransactionParameterNode>();
                 foreach (var key in keys)
                 {
                     CodeTemplate.TransactionParameterNode node = requestNode.TemplateNode.ParameterNodes.FirstOrDefault(x => x.Name == key);
@@ -613,14 +702,15 @@ namespace HelpersForCore
                         if (node.From == CodeTemplate.ParameterFrom.Template)
                         {
                             var complex = await GenerateAdapters(node, request);
-                            requestNode.TemplateNode.ComplexTemplateRequestNodes.AddRange(complex);
+                            transactionParameterNodes.AddRange(complex);
                         }
                         else
                         {
-                            requestNode.TemplateNode.ComplexTemplateRequestNodes.Add(node);
+                            transactionParameterNodes.Add(node);
                         }
                     }
                 }
+                requestNode.TemplateNode.TransactionParameterNodes = transactionParameterNodes.ToArray();
             }
         }
 
@@ -629,6 +719,7 @@ namespace HelpersForCore
         /// </summary>
         public static string[] GetAllTemplates(this CodeTemplate.TransactionParameterNode requestNode)
         {
+            // TODO: Change
             List<string> templates = new List<string>();
             if (requestNode.From == CodeTemplate.ParameterFrom.Template)
             {
