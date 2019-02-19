@@ -349,9 +349,6 @@ namespace HelpersForCore
             public string AdapterName { get; set; }
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string AdapterProperty { get; set; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public Dictionary<string, JToken> Adapters { get; set; }
         }
 
         public class TransactionParameterNode
@@ -410,7 +407,7 @@ namespace HelpersForCore
             public TransactionParameterNode[] ParameterNodes { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public Dictionary<string, JToken> Adapters { get; set; }
+            public JObject TransactionAdapter { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public TransactionParameterNode[] TransactionParameterNodes { get; set; }

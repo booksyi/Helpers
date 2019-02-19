@@ -730,7 +730,7 @@ namespace HelpersForCore
         /// <summary>
         /// 如果指定的成員為 null, 則將成員以 new() 取得一個值
         /// </summary>
-        public static T1 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression, Func<T2> newPropertyMethod = null) where T2: class, new()
+        public static T2 NewPropertyIfNull<T1, T2>(this T1 sender, Expression<Func<T1, T2>> expression, Func<T2> newPropertyMethod = null) where T2: class, new()
         {
             MemberExpression memberExpression = null;
             if (expression.Body is UnaryExpression unaryExpression
@@ -761,7 +761,7 @@ namespace HelpersForCore
                 }
                 property.SetValue(sender, value);
             }
-            return sender;
+            return value;
         }
 
         /// <summary>
