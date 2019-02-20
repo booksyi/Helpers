@@ -234,10 +234,11 @@ namespace HelpersForCore
             }
             else if (requestNode.From == CodeTemplate.RequestFrom.Input)
             {
-                string[] keys = requestNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
-                foreach (string key in keys)
+                // 處理 InputName 以 | 區隔，來依序尋找不為 null 或 Empty 的值
+                string[] inputNames = requestNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
+                foreach (string inputName in inputNames)
                 {
-                    JToken jToken = request?.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    JToken jToken = request?.Property(inputName, StringComparison.CurrentCultureIgnoreCase)?.Value;
                     if (string.IsNullOrWhiteSpace(Convert.ToString(jToken)) == false)
                     {
                         return jToken;
@@ -247,25 +248,17 @@ namespace HelpersForCore
             }
             else if (requestNode.From == CodeTemplate.RequestFrom.Adapter)
             {
-                JToken adapterValue = adapter?.Property(requestNode.AdapterName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                if (string.IsNullOrWhiteSpace(requestNode.AdapterProperty) && adapterValue is JValue jValue)
+                // 處理 AdapterProperty 以 . 區隔，來向下層尋找成員
+                JToken jToken = adapter?.Property(requestNode.AdapterName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                if (!string.IsNullOrWhiteSpace(requestNode.AdapterProperty) && jToken is JObject jObject)
                 {
-                    return jValue;
-                }
-                else if (adapterValue is JObject jObject)
-                {
-                    JToken jToken = jObject;
                     string[] propertyNames = requestNode.AdapterProperty.Split('.');
                     foreach (var propertyName in propertyNames)
                     {
                         jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
                     }
-                    return jToken;
                 }
-                else if (adapterValue is JArray jArray)
-                {
-                    return jArray;
-                }
+                return jToken;
             }
             return null;
         }
@@ -286,7 +279,7 @@ namespace HelpersForCore
             return url;
         }
         /// <summary>
-        /// 將 AdapterNode 轉成 JToken
+        /// 依照 AdapterNode 的設定透過 Http 取得 Api 的結果並以 JToken 的型態回傳
         /// </summary>
         public static async Task<JToken> ToJTokenAsync(this CodeTemplate.TransactionAdapterNode adapterNode, JObject request, JObject adapter)
         {
@@ -321,127 +314,219 @@ namespace HelpersForCore
             return jToken;
         }
 
-        public static async Task<JToken> ToJTokenAsync(this CodeTemplate.TransactionParameterNode parameterNode, JObject request, JObject adapter)
-        {
-            if (parameterNode.From == CodeTemplate.ParameterFrom.Value)
-            {
-                return parameterNode.Value;
-            }
-            else if (parameterNode.From == CodeTemplate.ParameterFrom.Input)
-            {
-                JToken jToken = null;
-                string[] keys = parameterNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
-                foreach (string key in keys)
-                {
-                    JToken propertyToken = request.Property(key, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                    if (string.IsNullOrWhiteSpace(Convert.ToString(propertyToken)) == false)
-                    {
-                        jToken = propertyToken;
-                        break;
-                    }
-                }
-                return jToken;
-            }
-            else if (parameterNode.From == CodeTemplate.ParameterFrom.Adapter)
-            {
-                JToken adapterValue = adapter?.Property(parameterNode.AdapterName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                if (string.IsNullOrWhiteSpace(parameterNode.AdapterProperty) && adapterValue is JValue jValue)
-                {
-                    return jValue;
-                }
-                else if (adapterValue is JObject jObject)
-                {
-                    JToken jToken = jObject;
-                    string[] propertyNames = parameterNode.AdapterProperty.Split('.');
-                    foreach (var propertyName in propertyNames)
-                    {
-                        jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
-                    }
-                    return jToken;
-                }
-                return null;
-            }
-            else if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
-            {
-                JArray jArray = new JArray();
-                if (parameterNode.TemplateNode.TransactionParameterNodes != null)
-                {
-                    foreach (var name in parameterNode.TemplateNode.TransactionParameterNodes.Select(x => x.Name).Distinct())
-                    {
-                        var parameterNodes = parameterNode.TemplateNode.TransactionParameterNodes.Where(x => x.Name == name);
-                        foreach (var templateParameterNode in parameterNodes)
-                        {
-                            JToken jToken = await templateParameterNode.ToJTokenAsync(request, parameterNode.TemplateNode.TransactionAdapter);
-                            jArray.Add(jToken);
-                        }
-                    }
-                }
-                return jArray;
-            }
-            return null;
-        }
-
         public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate template, JObject request)
         {
-            List<GenerateNode> nodes = new List<GenerateNode>();
+            // 依照 AdapterNodes 的設定, 生成 TransactionAdapter
+            List<CodeTemplate.TransactionTemplateNode> transactionTemplateNodes = new List<CodeTemplate.TransactionTemplateNode>();
             foreach (var templateNode in template.TemplateNodes)
             {
                 CodeTemplate.TransactionTemplateNode transactionTemplateNode = templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>();
-                await transactionTemplateNode.GenerateTransactionAdapter(request);
-                await transactionTemplateNode.GenerateTransactionParameterNodes(request);
-                nodes.AddRange(await transactionTemplateNode.ToGenerateNodesAsync(request));
+                transactionTemplateNodes.AddRange(await transactionTemplateNode.GenerateTransactionAdapter(request));
             }
-            return nodes;
-        }
 
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
-        {
-            GenerateNode generateNode = new GenerateNode();
-            generateNode.ApplyApi = templateNode.ToUrl(request);
-            foreach (var parameterNode in templateNode.ParameterNodes)
+            // 依照 ParameterNodes 的設定, 生成可直接串接的 TransactionParameterNodes
+            foreach (CodeTemplate.TransactionTemplateNode transactionTemplateNode in transactionTemplateNodes)
             {
-                JToken jToken = await parameterNode.ToJTokenAsync(request, templateNode.TransactionAdapter);
-                if (jToken is JArray jArray)
-                {
-                    foreach (var arrayToken in jArray)
-                    {
-                        generateNode.AppendChild(parameterNode.Name, Convert.ToString(arrayToken));
-                    }
-                }
-                else
-                {
-                    generateNode.AppendChild(parameterNode.Name, Convert.ToString(jToken));
-                }
+                await transactionTemplateNode.GenerateTransactionParameterNodes(request);
             }
-            return new GenerateNode[] { generateNode };
+
+            // 將 TransactionTemplateNode 轉換成 GenerateNode
+            List<GenerateNode> generateNodes = new List<GenerateNode>();
+            foreach (CodeTemplate.TransactionTemplateNode transactionTemplateNode in transactionTemplateNodes)
+            {
+                generateNodes.AddRange(await transactionTemplateNode.ToGenerateNodesAsync(request));
+            }
+            return generateNodes;
         }
 
-        /*
-        /// <summary>
-        /// 將 ParameterNode 轉成 IEnumerable&lt;GenerateNode&gt;
-        /// </summary>
-        public static async Task<IEnumerable<GenerateNode>> ToGenerateNodesAsync(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
+        private static async Task<GenerateNode[]> ToGenerateNodesAsync(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
         {
             GenerateNode generateNode = new GenerateNode();
             generateNode.ApplyApi = templateNode.ToUrl(request);
             if (templateNode.TransactionParameterNodes != null)
             {
-                foreach (var key in templateNode.TransactionParameterNodes.Select(x => x.Name).Distinct())
+                foreach (var templateParameterNode in templateNode.TransactionParameterNodes)
                 {
-                    var parameterNodes = templateNode.TransactionParameterNodes.Where(x => x.Name == key);
-                    foreach (var node in parameterNodes)
+                    var children = await templateParameterNode.ToGenerateNodesAsync(request, templateNode.TransactionAdapter);
+                    foreach (var child in children)
                     {
-                        var children = await node.ToJTokenAsync(request);
-                        foreach (var child in children)
-                        {
-                            generateNode.AppendChild(child).ChangeKey(key);
-                        }
+                        generateNode.AppendChild(child).ChangeKey(templateParameterNode.Name);
                     }
                 }
             }
             return new GenerateNode[] { generateNode };
+        }
 
-        }*/
+        private static async Task<GenerateNode[]> ToGenerateNodesAsync(this CodeTemplate.TransactionParameterNode parameterNode, JObject request, JObject adapter)
+        {
+            JToken jToken = null;
+            if (parameterNode.From == CodeTemplate.ParameterFrom.Value)
+            {
+                jToken = parameterNode.Value;
+            }
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Input)
+            {
+                // 處理 InputName 以 | 區隔，來依序尋找不為 null 或 Empty 的值
+                string[] inputNames = parameterNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
+                foreach (string inputName in inputNames)
+                {
+                    jToken = request.Property(inputName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    if (string.IsNullOrWhiteSpace(Convert.ToString(jToken)) == false)
+                    {
+                        break;
+                    }
+                }
+            }
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Adapter)
+            {
+                // 處理 AdapterProperty 以 . 區隔，來向下層尋找成員
+                jToken = adapter?.Property(parameterNode.AdapterName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                if (!string.IsNullOrWhiteSpace(parameterNode.AdapterProperty) && jToken is JObject jObject)
+                {
+                    string[] propertyNames = parameterNode.AdapterProperty.Split('.');
+                    foreach (var propertyName in propertyNames)
+                    {
+                        jToken = (jToken as JObject)?.Property(propertyName, StringComparison.CurrentCultureIgnoreCase)?.Value;
+                    }
+                }
+            }
+            else if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
+            {
+                //parameterNode.TemplateNode.TransactionAdapter = adapter;
+                return await parameterNode.TemplateNode.ToGenerateNodesAsync(request);
+            }
+            if (jToken != null)
+            {
+                if (jToken is JArray jArray)
+                {
+                    List<GenerateNode> generateNodes = new List<GenerateNode>();
+                    foreach (JToken arrayToken in jArray)
+                    {
+                        generateNodes.Add(new GenerateNode()
+                        {
+                            ApplyValue = Convert.ToString(arrayToken)
+                        });
+                    }
+                    return generateNodes.ToArray();
+                }
+                else
+                {
+                    return new GenerateNode[]
+                    {
+                        new GenerateNode()
+                        {
+                            ApplyValue = Convert.ToString(jToken)
+                        }
+                    };
+                }
+            }
+            return new GenerateNode[0];
+        }
+
+        /// <summary>
+        /// 依照 AdapterNodes 生成 TransactionAdapter
+        /// </summary>
+        public static async Task<CodeTemplate.TransactionTemplateNode[]> GenerateTransactionAdapter(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
+        {
+            if (templateNode.AdapterNodes != null && templateNode.AdapterNodes.Any())
+            {
+                templateNode.NewPropertyIfNull(x => x.TransactionAdapter);
+                // 因為生成 TransactionAdapter 會以遞迴方式處理, 所以可能會已經有部分的 AdapterNode 處理過了
+                string[] adapterNames = templateNode.TransactionAdapter.Properties().Select(x => x.Name).ToArray();
+                // 只處理未處理過的 AdapterNode
+                CodeTemplate.TransactionAdapterNode[] adapterNodes = templateNode.AdapterNodes.Where(x => adapterNames.Contains(x.Name) == false).ToArray();
+                foreach (var adapterNode in adapterNodes)
+                {
+                    JToken jToken = await adapterNode.ToJTokenAsync(request, templateNode.TransactionAdapter);
+                    if (adapterNode.ResponseSplit)
+                    {
+                        // 如果 ResponseSplit == true,
+                        // 若回傳的結果為 Object 且只有一個成員,
+                        // 則向下尋訪該成員的值是否為 Array
+                        JObject adapterObject = new JObject();
+                        JObject adapterPropertyObject = adapterObject;
+                        JProperty adapterProperty = null;
+                        while (jToken is JObject tokenObject && tokenObject.Properties().Count() == 1)
+                        {
+                            JProperty jProperty = tokenObject.Properties().First();
+                            adapterPropertyObject.Add(jProperty.Name, new JObject());
+                            adapterProperty = adapterPropertyObject.Property(jProperty.Name);
+                            adapterPropertyObject = adapterProperty.Value as JObject;
+                            jToken = jProperty.Value;
+                        }
+                        if (jToken is JArray jArray)
+                        {
+                            List<CodeTemplate.TransactionTemplateNode> transactionTemplateNodes = new List<CodeTemplate.TransactionTemplateNode>();
+                            // adapterProperty != null 代表有向下尋訪,
+                            // TransactionAdapter 的值要以最上層的 adapterObject 為主
+                            if (adapterProperty != null)
+                            {
+                                foreach (JToken arrayToken in jArray)
+                                {
+                                    adapterProperty.Value = arrayToken;
+                                    var cloneAdapterObject = JObject.Parse(adapterObject.ToString());
+                                    var cloneTemplateNode = templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>();
+                                    cloneTemplateNode.TransactionAdapter.Add(adapterNode.Name, cloneAdapterObject);
+                                    transactionTemplateNodes.AddRange(await cloneTemplateNode.GenerateTransactionAdapter(request));
+                                }
+                            }
+                            else
+                            {
+                                foreach (JToken arrayToken in jArray)
+                                {
+                                    var cloneTemplateNode = templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>();
+                                    cloneTemplateNode.TransactionAdapter.Add(adapterNode.Name, arrayToken);
+                                    transactionTemplateNodes.AddRange(await cloneTemplateNode.GenerateTransactionAdapter(request));
+                                }
+                            }
+                            return transactionTemplateNodes.ToArray();
+                        }
+                        else if (adapterProperty != null)
+                        {
+                            // 如果 ResponseSplit == true, 但是資料並非 Array 則將 jToken 還原
+                            adapterProperty.Value = jToken;
+                            jToken = adapterObject;
+                        }
+                    }
+                    templateNode.TransactionAdapter.Add(adapterNode.Name, jToken);
+                }
+            }
+            return new CodeTemplate.TransactionTemplateNode[] { templateNode };
+        }
+
+        /// <summary>
+        /// 依照 ParameterNodes 生成 TransactionParameterNodes
+        /// </summary>
+        public static async Task GenerateTransactionParameterNodes(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
+        {
+            if (templateNode.ParameterNodes != null && templateNode.ParameterNodes.Any())
+            {
+                var transactionParameterNodes = new List<CodeTemplate.TransactionParameterNode>();
+                foreach (var parameterNode in templateNode.ParameterNodes)
+                {
+                    if (parameterNode != null)
+                    {
+                        if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
+                        {
+                            //parameterNode.TemplateNode.TransactionAdapter = templateNode.TransactionAdapter;
+                            var transactionTemplateNodes = await parameterNode.TemplateNode.GenerateTransactionAdapter(request);
+                            foreach (var transactionTemplateNode in transactionTemplateNodes)
+                            {
+                                var cloneParameterNode = parameterNode.JsonConvertTo<CodeTemplate.TransactionParameterNode>();
+                                cloneParameterNode.TemplateNode = transactionTemplateNode;
+                                await cloneParameterNode.TemplateNode.GenerateTransactionParameterNodes(request);
+                                transactionParameterNodes.Add(cloneParameterNode);
+                            }
+                        }
+                        else
+                        {
+                            transactionParameterNodes.Add(parameterNode);
+                        }
+                    }
+                }
+                templateNode.TransactionParameterNodes = transactionParameterNodes.ToArray();
+            }
+        }
 
         /// <summary>
         /// 將 JObject 限縮在指定成員
@@ -473,112 +558,6 @@ namespace HelpersForCore
                 return confineObject;
             }
             return source;
-        }
-
-        /// <summary>
-        /// 依照 AdapterNodes 生成 TransactionAdapter
-        /// </summary>
-        public static async Task<CodeTemplate.TransactionTemplateNode[]> GenerateTransactionAdapter(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
-        {
-            if (templateNode != null
-                && templateNode.AdapterNodes.NotNullAny())
-            {
-                templateNode.NewPropertyIfNull(x => x.TransactionAdapter);
-                string adapterNodeKey = templateNode.AdapterNodes.First().Name;
-                var adapterNode = templateNode.AdapterNodes.FirstOrDefault(x => x.Name == adapterNodeKey);
-                templateNode.AdapterNodes = templateNode.AdapterNodes.Where(x => x.Name != adapterNodeKey).ToArray();
-
-                JToken adapterNodeValue = await adapterNode.ToJTokenAsync(request, templateNode.TransactionAdapter);
-                if (adapterNodeValue is JObject jObject)
-                {
-                    if (adapterNode.ResponseSplit)
-                    {
-                        JObject adapterObject = new JObject();
-                        JProperty adapterProperty = null;
-                        JToken jToken = jObject;
-                        while (jToken is JObject tokenObject && tokenObject.Properties().Count() == 1)
-                        {
-                            JProperty jProperty = tokenObject.Properties().First();
-                            adapterObject.Add(jProperty.Name, null);
-                            adapterProperty = adapterObject.Property(jProperty.Name, StringComparison.CurrentCultureIgnoreCase);
-                            jToken = jProperty.Value;
-                        }
-                        if (jToken is JArray jArray)
-                        {
-                            List<CodeTemplate.TransactionTemplateNode> nodes = new List<CodeTemplate.TransactionTemplateNode>();
-                            foreach (JToken arrayToken in jArray)
-                            {
-                                adapterProperty.Value = arrayToken;
-                                var cloneAdapterObject = JObject.Parse(adapterObject.ToString());
-                                var cloneRequestNode = templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>();
-                                cloneRequestNode.TransactionAdapter.Add(adapterNodeKey, cloneAdapterObject);
-                                nodes.AddRange(await GenerateTransactionAdapter(cloneRequestNode, request));
-                            }
-                            return nodes.ToArray();
-                        }
-                    }
-                    else
-                    {
-                        templateNode.TransactionAdapter.Add(adapterNodeKey, jObject);
-                        return await GenerateTransactionAdapter(templateNode, request);
-                    }
-                }
-                else if (adapterNodeValue is JArray jArray)
-                {
-                    if (adapterNode.ResponseSplit)
-                    {
-                        List<CodeTemplate.TransactionTemplateNode> nodes = new List<CodeTemplate.TransactionTemplateNode>();
-                        foreach (JToken arrayToken in jArray)
-                        {
-                            var cloneRequestNode = templateNode.JsonConvertTo<CodeTemplate.TransactionTemplateNode>();
-                            cloneRequestNode.TransactionAdapter.Add(adapterNodeKey, arrayToken);
-                            nodes.AddRange(await GenerateTransactionAdapter(cloneRequestNode, request));
-                        }
-                        return nodes.ToArray();
-                    }
-                    else
-                    {
-                        JArray adapterArray = new JArray();
-                        foreach (JToken arrayToken in jArray)
-                        {
-                            adapterArray.Add(arrayToken);
-                        }
-                        templateNode.TransactionAdapter.Add(adapterNodeKey, adapterArray);
-                        return await GenerateTransactionAdapter(templateNode, request);
-                    }
-                }
-            }
-            return new CodeTemplate.TransactionTemplateNode[] { templateNode };
-        }
-        /// <summary>
-        /// 依照 ParameterNodes 生成 TransactionParameterNodes
-        /// </summary>
-        public static async Task GenerateTransactionParameterNodes(this CodeTemplate.TransactionTemplateNode templateNode, JObject request)
-        {
-            if (templateNode.ParameterNodes.NotNullAny())
-            {
-                string[] keys = templateNode.ParameterNodes.Select(x => x.Name).ToArray();
-                var transactionParameterNodes = new List<CodeTemplate.TransactionParameterNode>();
-                foreach (var key in keys)
-                {
-                    CodeTemplate.TransactionParameterNode parameterNode = templateNode.ParameterNodes.FirstOrDefault(x => x.Name == key);
-                    if (parameterNode != null)
-                    {
-                        if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
-                        {
-                            parameterNode.TemplateNode.TransactionAdapter = templateNode.TransactionAdapter;
-                            var complex = await GenerateTransactionAdapter(parameterNode.TemplateNode, request);
-                            // TODO: QQ
-                            //transactionParameterNodes.AddRange(complex);
-                        }
-                        else
-                        {
-                            transactionParameterNodes.Add(parameterNode);
-                        }
-                    }
-                }
-                templateNode.TransactionParameterNodes = transactionParameterNodes.ToArray();
-            }
         }
 
         /// <summary>
