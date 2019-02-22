@@ -153,21 +153,89 @@ namespace HelpersForCore
             public string Name { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string DefaultValue { get; set; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Description { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-            public bool IsJson { get; set; }
+            public bool IsMultiple { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-            public bool Split { get; set; }
+            public bool IsSplit { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string[] DefaultValues { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public InputChild[] Children { get; set; }
 
             public Input() { }
             public Input(string name)
             {
                 Name = name;
+            }
+
+            public Input HasDescription(string description)
+            {
+                Description = description;
+                return this;
+            }
+
+            public Input HasDefaultValues(params string[] defaultValues)
+            {
+                DefaultValues = defaultValues;
+                return this;
+            }
+
+            public Input Multiple(bool isMultiple = true)
+            {
+                IsMultiple = isMultiple;
+                return this;
+            }
+
+            public Input Split(bool isSplit = true)
+            {
+                IsSplit = isSplit;
+                return this;
+            }
+        }
+
+        public class InputChild
+        {
+            public string Name { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Description { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool IsMultiple { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string[] DefaultValues { get; set; }
+
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public InputChild[] Children { get; set; }
+
+            public InputChild() { }
+            public InputChild(string name)
+            {
+                Name = name;
+            }
+
+            public InputChild HasDescription(string description)
+            {
+                Description = description;
+                return this;
+            }
+
+            public InputChild HasDefaultValues(params string[] defaultValues)
+            {
+                DefaultValues = defaultValues;
+                return this;
+            }
+
+            public InputChild Multiple(bool isMultiple = true)
+            {
+                IsMultiple = isMultiple;
+                return this;
             }
         }
 
@@ -297,7 +365,7 @@ namespace HelpersForCore
             public string ResponseConfine { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-            public bool ResponseSplit { get; set; }
+            public bool IsSplit { get; set; }
 
             public AdapterNode() { }
             public AdapterNode(string name, string url, HttpMethod httpMethod = HttpMethod.Get)
@@ -390,7 +458,7 @@ namespace HelpersForCore
             public string ResponseConfine { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
-            public bool ResponseSplit { get; set; }
+            public bool IsSplit { get; set; }
         }
 
         public class TransactionTemplateNode
