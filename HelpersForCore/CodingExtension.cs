@@ -226,7 +226,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 RequestNode 轉成 JToken
         /// </summary>
-        public static JToken ToJToken(this CodeTemplate.TransactionRequestNode requestNode, JObject input, JObject adapter)
+        private static JToken ToJToken(this CodeTemplate.TransactionRequestNode requestNode, JObject input, JObject adapter)
         {
             if (requestNode.From == CodeTemplate.RequestFrom.Value)
             {
@@ -271,7 +271,7 @@ namespace HelpersForCore
         /// <summary>
         /// 依照 AdapterNode 的設定透過 Http 取得 Api 的結果並以 JToken 的型態回傳
         /// </summary>
-        public static async Task<JToken> ToJTokenAsync(this CodeTemplate.TransactionAdapterNode adapterNode, JObject input, JObject adapter)
+        private static async Task<JToken> ToJTokenAsync(this CodeTemplate.TransactionAdapterNode adapterNode, JObject input, JObject adapter)
         {
             HttpClient client = new HttpClient();
             string json = null;
@@ -306,7 +306,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 TemplateNode 轉成 Url
         /// </summary>
-        public static string ToUrl(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
+        private static string ToUrl(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
         {
             string url = templateNode.Url;
             if (templateNode.RequestNodes.NotNullAny())
@@ -466,7 +466,7 @@ namespace HelpersForCore
         /// <summary>
         /// 依照 AdapterNodes 生成 TransactionAdapter
         /// </summary>
-        public static async Task<CodeTemplate.TransactionTemplateNode[]> GenerateTransactionAdapter(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
+        private static async Task<CodeTemplate.TransactionTemplateNode[]> GenerateTransactionAdapter(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
         {
             if (templateNode.AdapterNodes != null && templateNode.AdapterNodes.Any())
             {
@@ -537,7 +537,7 @@ namespace HelpersForCore
         /// <summary>
         /// 依照 ParameterNodes 生成 TransactionParameterNodes
         /// </summary>
-        public static async Task GenerateTransactionParameterNodes(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
+        private static async Task GenerateTransactionParameterNodes(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
         {
             if (templateNode.ParameterNodes != null && templateNode.ParameterNodes.Any())
             {
@@ -572,7 +572,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 JObject 限縮在指定成員
         /// </summary>
-        public static JObject Confine(this JObject source, string propertyConfine)
+        private static JObject Confine(this JObject source, string propertyConfine)
         {
             if (string.IsNullOrWhiteSpace(propertyConfine) == false)
             {
@@ -610,77 +610,29 @@ namespace HelpersForCore
         }
 
         /// <summary>
-        /// 取得 RequestNode 所有用到的樣板 API URL
+        /// 取得 CodeTemplate 所有用到的樣板 API URL
         /// </summary>
-        public static string[] GetAllTemplates(this CodeTemplate.TransactionParameterNode requestNode)
+        public static string[] GetTemplateUris(this CodeTemplate codeTemplate)
         {
-            // TODO: Change
             List<string> templates = new List<string>();
-            if (requestNode.From == CodeTemplate.ParameterFrom.Template)
+            foreach (var templateNode in codeTemplate.TemplateNodes)
             {
-                templates.Add(requestNode.TemplateNode.Url);
-                if (requestNode.TemplateNode.ParameterNodes.NotNullAny())
-                {
-                    templates.AddRange(
-                        requestNode
-                            .TemplateNode
-                            .ParameterNodes
-                            .SelectMany(x => x.GetAllTemplates()));
-                }
+                templates.AddRange(templateNode.GetTemplateUris());
             }
             return templates.Distinct().ToArray();
         }
-
-        /// <summary>
-        /// 取得 RequestNode 所有用到 Input 的 Key
-        /// </summary>
-        public static Dictionary<string, string[]> GetAllRequestKeys(this CodeTemplate.TransactionParameterNode requestNode)
+        private static string[] GetTemplateUris(this CodeTemplate.TemplateNode templateNode)
         {
-            if (requestNode.From == CodeTemplate.ParameterFrom.Input)
+            List<string> templates = new List<string>();
+            templates.Add(templateNode.Url);
+            foreach (var parameterNode in templateNode.ParameterNodes)
             {
-                if (string.IsNullOrWhiteSpace(requestNode.HttpRequestDescription))
+                if (parameterNode.From == CodeTemplate.ParameterFrom.Template)
                 {
-                    return new Dictionary<string, string[]>() { {
-                        requestNode.InputName,
-                        new string[0] } };
+                    templates.AddRange(parameterNode.TemplateNode.GetTemplateUris());
                 }
-                return new Dictionary<string, string[]>() { {
-                    requestNode.InputName,
-                    new string[] { requestNode.HttpRequestDescription } } };
             }
-            else if (requestNode.From == CodeTemplate.ParameterFrom.Template)
-            {
-                List<KeyValuePair<string, string[]>> items = new List<KeyValuePair<string, string[]>>();
-                if (requestNode.TemplateNode.AdapterNodes.NotNullAny())
-                {
-                    items.AddRange(requestNode
-                        .TemplateNode
-                        .AdapterNodes
-                        .Where(x => x.RequestNodes.NotNullAny())
-                        .SelectMany(x => x.RequestNodes
-                            .Where(y => y.From == CodeTemplate.RequestFrom.Input)
-                            .Select(y => (Key: y.InputName, Description: y.HttpRequestDescription)))
-                        .GroupBy(x => x.Key)
-                        .Select(x => new KeyValuePair<string, string[]>(
-                            x.Key,
-                            x.Select(y => y.Description)
-                                .Where(y => string.IsNullOrWhiteSpace(y) == false)
-                                .Distinct()
-                                .ToArray())));
-                }
-                if (requestNode.TemplateNode.ParameterNodes.NotNullAny())
-                {
-                    items.AddRange(requestNode
-                        .TemplateNode
-                        .ParameterNodes
-                        .SelectMany(x => x.GetAllRequestKeys()));
-                }
-                return items
-                    .GroupBy(x => x.Key)
-                    .Select(x => new KeyValuePair<string, string[]>(x.Key, x.SelectMany(y => y.Value).Distinct().ToArray()))
-                    .ToDictionary(x => x.Key, x => x.Value);
-            }
-            return new Dictionary<string, string[]>();
+            return templates.Distinct().ToArray();
         }
     }
 }
