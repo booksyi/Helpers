@@ -156,6 +156,9 @@ namespace HelpersForCore
             public string Description { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool IsRequired { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
             public bool IsMultiple { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
@@ -185,6 +188,12 @@ namespace HelpersForCore
                 return this;
             }
 
+            public Input Required(bool isRequired = true)
+            {
+                IsRequired = isRequired;
+                return this;
+            }
+
             public Input Multiple(bool isMultiple = true)
             {
                 IsMultiple = isMultiple;
@@ -204,6 +213,9 @@ namespace HelpersForCore
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Description { get; set; }
+
+            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+            public bool IsRequired { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
             public bool IsMultiple { get; set; }
@@ -229,6 +241,12 @@ namespace HelpersForCore
             public InputChild HasDefaultValues(params string[] defaultValues)
             {
                 DefaultValues = defaultValues;
+                return this;
+            }
+
+            public InputChild Required(bool isRequired = true)
+            {
+                IsRequired = isRequired;
                 return this;
             }
 

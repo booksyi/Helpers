@@ -319,6 +319,123 @@ namespace HelpersForCore
             return url;
         }
 
+        /// <summary>
+        /// 檢查 CodeTemplate 是否合法，並回傳簡化後的物件
+        /// </summary>
+        public static bool Validate(this CodeTemplate template, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            if (template.Inputs.Validate(out string[] outErrorMessages) == false)
+            {
+                errors.AddRange(outErrorMessages);
+            }
+            foreach (var templateNode in template.TemplateNodes)
+            {
+                if (templateNode.Validate(out outErrorMessages) == false)
+                {
+                    errors.AddRange(outErrorMessages);
+                }
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+
+        private static bool Validate(this CodeTemplate.Input[] inputs, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            List<string> temp = new List<string>();
+            foreach (var input in inputs)
+            {
+                input.Name = input.Name.Trim();
+                if (temp.Contains(input.Name))
+                {
+                    errors.Add($"Input 名稱重複: {input.Name}");
+                }
+                if (input.Children.Validate(out string[] outErrorMessages) == false)
+                {
+                    errors.AddRange(outErrorMessages);
+                }
+                temp.Add(input.Name);
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+        private static bool Validate(this CodeTemplate.InputChild[] inputs, out string[] errorMessages)
+        {
+            CodeTemplate.Input[] args = inputs.JsonConvertTo<CodeTemplate.Input[]>();
+            return args.Validate(out errorMessages);
+        }
+        private static bool Validate(this CodeTemplate.TemplateNode templateNode, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            if (templateNode.RequestNodes.Validate(out string[] outErrorMessages) == false)
+            {
+                errors.AddRange(outErrorMessages);
+            }
+            if (templateNode.AdapterNodes.Validate(out outErrorMessages) == false)
+            {
+                errors.AddRange(outErrorMessages);
+            }
+            if (templateNode.ParameterNodes.Validate(out outErrorMessages) == false)
+            {
+                errors.AddRange(outErrorMessages);
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+        private static bool Validate(this CodeTemplate.RequestNode[] requestNodes, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            List<string> temp = new List<string>();
+            foreach (var requestNode in requestNodes)
+            {
+                requestNode.Name = requestNode.Name.Trim();
+                if (temp.Contains(requestNode.Name))
+                {
+                    errors.Add($"Request 名稱重複: {requestNode.Name}");
+                }
+                temp.Add(requestNode.Name);
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+        private static bool Validate(this CodeTemplate.AdapterNode[] adapterNodes, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            List<string> temp = new List<string>();
+            foreach (var adapterNode in adapterNodes)
+            {
+                adapterNode.Name = adapterNode.Name.Trim();
+                if (temp.Contains(adapterNode.Name))
+                {
+                    errors.Add($"Adapter 名稱重複: {adapterNode.Name}");
+                }
+                temp.Add(adapterNode.Name);
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+        private static bool Validate(this CodeTemplate.ParameterNode[] parameterNodes, out string[] errorMessages)
+        {
+            List<string> errors = new List<string>();
+            List<string> temp = new List<string>();
+            foreach (var parameterNode in parameterNodes)
+            {
+                parameterNode.Name = parameterNode.Name.Trim();
+                if (temp.Contains(parameterNode.Name))
+                {
+                    errors.Add($"Parameter 名稱重複: {parameterNode.Name}");
+                }
+                if (parameterNode.TemplateNode.Validate(out string[] outErrorMessages) == false)
+                {
+                    errors.AddRange(outErrorMessages);
+                }
+                temp.Add(parameterNode.Name);
+            }
+            errorMessages = errors.ToArray();
+            return errorMessages.Length == 0;
+        }
+
         public static async Task<GenerateNode[]> ToGenerateNodesAsync(this CodeTemplate template, JObject request)
         {
             // Split Inputs
