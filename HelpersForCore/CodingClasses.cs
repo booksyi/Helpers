@@ -250,9 +250,6 @@ namespace HelpersForCore
             public string InputProperty { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string HttpRequestDescription { get; set; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string Value { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
@@ -302,9 +299,6 @@ namespace HelpersForCore
             public string InputName { get; set; }
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string InputProperty { get; set; }
-
-            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string HttpRequestDescription { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
             public string AdapterName { get; set; }
