@@ -319,23 +319,43 @@ namespace HelpersForCore
             return url;
         }
 
+        #region Validate CodeTemplate
         /// <summary>
         /// 檢查 CodeTemplate 是否合法，並回傳簡化後的物件
         /// </summary>
         public static bool Validate(this CodeTemplate template, out string[] errorMessages)
         {
             List<string> errors = new List<string>();
-            if (template.Inputs.Validate(out string[] outErrorMessages) == false)
+            if (template.Inputs != null)
             {
-                errors.AddRange(outErrorMessages);
-            }
-            foreach (var templateNode in template.TemplateNodes)
-            {
-                if (templateNode.Validate(out outErrorMessages) == false)
+                if (template.Inputs.Any())
                 {
-                    errors.AddRange(outErrorMessages);
+                    if (template.Inputs.Validate(out string[] outErrorMessages) == false)
+                    {
+                        errors.AddRange(outErrorMessages);
+                    }
+                }
+                else
+                {
+                    template.Inputs = null;
                 }
             }
+
+            if (template.TemplateNodes != null && template.TemplateNodes.Any())
+            {
+                foreach (var templateNode in template.TemplateNodes)
+                {
+                    if (templateNode.Validate(out string[] outErrorMessages) == false)
+                    {
+                        errors.AddRange(outErrorMessages);
+                    }
+                }
+            }
+            else
+            {
+                errors.Add($"至少需要一個 TemplateNode");
+            }
+
             errorMessages = errors.ToArray();
             return errorMessages.Length == 0;
         }
@@ -351,9 +371,19 @@ namespace HelpersForCore
                 {
                     errors.Add($"Input 名稱重複: {input.Name}");
                 }
-                if (input.Children.Validate(out string[] outErrorMessages) == false)
+                if (input.Children != null)
                 {
-                    errors.AddRange(outErrorMessages);
+                    if (input.Children.Any())
+                    {
+                        if (input.Children.Validate(out string[] outErrorMessages) == false)
+                        {
+                            errors.AddRange(outErrorMessages);
+                        }
+                    }
+                    else
+                    {
+                        input.Children = null;
+                    }
                 }
                 temp.Add(input.Name);
             }
@@ -435,6 +465,7 @@ namespace HelpersForCore
             errorMessages = errors.ToArray();
             return errorMessages.Length == 0;
         }
+        #endregion
 
         public static async Task<GenerateNode[]> ToGenerateNodesAsync(this CodeTemplate template, JObject request)
         {
