@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -500,14 +501,17 @@ namespace HelpersForCore
             /// <summary>
             /// 固定值
             /// </summary>
+            [EnumMember(Value = "value")]
             Value,
             /// <summary>
             /// 輸入參數
             /// </summary>
+            [EnumMember(Value = "input")]
             Input,
             /// <summary>
             /// 中繼資料
             /// </summary>
+            [EnumMember(Value = "adapter")]
             Adapter
         }
 
@@ -517,25 +521,32 @@ namespace HelpersForCore
             /// <summary>
             /// 固定值
             /// </summary>
+            [EnumMember(Value = "value")]
             Value,
             /// <summary>
             /// 輸入參數
             /// </summary>
+            [EnumMember(Value = "input")]
             Input,
             /// <summary>
             /// 中繼資料
             /// </summary>
+            [EnumMember(Value = "adapter")]
             Adapter,
             /// <summary>
             /// 樣板
             /// </summary>
+            [EnumMember(Value = "template")]
             Template
         }
 
         [JsonConverter(typeof(StringEnumConverter))]
         public enum HttpMethod
         {
+            [EnumMember(Value = "get")]
             Get,
+
+            [EnumMember(Value = "post")]
             Post
         }
     }
