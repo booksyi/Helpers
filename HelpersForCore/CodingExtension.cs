@@ -527,6 +527,7 @@ namespace HelpersForCore
         private static async Task<GenerateNode[]> ToGenerateNodesAsync(this CodeTemplate.TransactionTemplateNode templateNode, JObject input)
         {
             GenerateNode generateNode = new GenerateNode();
+            generateNode.ApplyKey = templateNode.Name;
             generateNode.ApplyApi = templateNode.ToUrl(input);
             if (templateNode.TransactionParameterNodes != null)
             {

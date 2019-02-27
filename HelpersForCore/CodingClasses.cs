@@ -391,6 +391,8 @@ namespace HelpersForCore
 
         public class TemplateNode
         {
+            public string Name { get; set; }
+
             public string Url { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
@@ -476,6 +478,8 @@ namespace HelpersForCore
 
         public class TransactionTemplateNode
         {
+            public string Name { get; set; }
+
             public string Url { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
