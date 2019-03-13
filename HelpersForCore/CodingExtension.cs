@@ -12,6 +12,196 @@ namespace HelpersForCore
 {
     public static class CodingExtension
     {
+        public static CsSchemaProperty ToCsProperty(this DbSchemaField dbField)
+        {
+            CsSchemaProperty csProperty = new CsSchemaProperty() { Name = dbField.Name };
+            #region set attributes
+            List<CsSchemaAttribute> attributes = new List<CsSchemaAttribute>();
+            if (dbField.IsIdentity)
+            {
+                attributes.Add(new CsSchemaAttribute("Key"));
+                attributes.Add(new CsSchemaAttribute("DatabaseGenerated")
+                {
+                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    {
+                        { "databaseGeneratedOption", new CsSchemaValue("DatabaseGeneratedOption.Identity", false) }
+                    }
+                });
+            }
+            if (dbField.TypeName.In("char", "nchar", "ntext", "nvarchar", "text", "varchar", "xml"))
+            {
+                if (dbField.IsNullable == false)
+                {
+                    attributes.Add(new CsSchemaAttribute("Required"));
+                }
+                attributes.Add(new CsSchemaAttribute("Column")
+                {
+                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    {
+                        { "name", new CsSchemaValue(dbField.Name) }
+                    }
+                });
+                if (dbField.Length > 0)
+                {
+                    attributes.Add(new CsSchemaAttribute("StringLength")
+                    {
+                        ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                        {
+                            { "maximumLength", new CsSchemaValue(dbField.Length) }
+                        }
+                    });
+                }
+            }
+            else
+            {
+                attributes.Add(new CsSchemaAttribute("Column")
+                {
+                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    {
+                        { "name", new CsSchemaValue(dbField.Name) }
+                    },
+                    Properties = new Dictionary<string, CsSchemaValue>
+                    {
+                        { "TypeName", new CsSchemaValue(dbField.TypeFullName) }
+                    }
+                });
+            }
+            csProperty.Attributes = attributes.ToArray();
+            #endregion
+            #region convert type
+            switch (dbField.TypeName)
+            {
+                case "bigint":
+                    csProperty.TypeName = $"long{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "binary":
+                    csProperty.TypeName = "byte[]";
+                    break;
+                case "bit":
+                    csProperty.TypeName = $"bool{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "char":
+                    csProperty.TypeName = "string";
+                    break;
+                case "date":
+                case "datetime":
+                case "datetime2":
+                    csProperty.TypeName = $"DateTime{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "datetimeoffset":
+                    csProperty.TypeName = $"DateTimeOffset{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "decimal":
+                    csProperty.TypeName = $"decimal{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "float":
+                    csProperty.TypeName = $"double{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "image":
+                    csProperty.TypeName = "byte[]";
+                    break;
+                case "int":
+                    csProperty.TypeName = $"int{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "money":
+                    csProperty.TypeName = $"decimal{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "nchar":
+                    csProperty.TypeName = "string";
+                    break;
+                case "ntext":
+                    csProperty.TypeName = "string";
+                    break;
+                case "numeric":
+                    csProperty.TypeName = $"decimal{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "nvarchar":
+                    csProperty.TypeName = "string";
+                    break;
+                case "real":
+                    csProperty.TypeName = $"float{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "smalldatetime":
+                    csProperty.TypeName = $"DateTime{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "smallint":
+                    csProperty.TypeName = $"short{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "smallmoney":
+                    csProperty.TypeName = $"decimal{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "sql_variant":
+                    csProperty.TypeName = "object";
+                    break;
+                case "text":
+                    csProperty.TypeName = "string";
+                    break;
+                case "time":
+                    csProperty.TypeName = $"TimeSpan{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "timestamp":
+                    csProperty.TypeName = "byte[]";
+                    break;
+                case "tinyint":
+                    csProperty.TypeName = $"byte{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "uniqueidentifier":
+                    csProperty.TypeName = $"Guid{(dbField.IsNullable ? "?" : "")}";
+                    break;
+                case "varbinary":
+                    csProperty.TypeName = "byte[]";
+                    break;
+                case "varchar":
+                    csProperty.TypeName = "string";
+                    break;
+                case "xml":
+                    csProperty.TypeName = "string";
+                    break;
+            }
+            #endregion
+            return csProperty;
+        }
+
+        public static TsSchemaProperty ToTsProperty(this CsSchemaProperty csProperty)
+        {
+            TsSchemaProperty tsProperty = new TsSchemaProperty();
+            #region convert type
+            tsProperty.Name = csProperty.Name;
+            switch (csProperty.TypeName)
+            {
+                case "string":
+                    tsProperty.TypeName = "string";
+                    break;
+                case "bool":
+                    tsProperty.TypeName = "boolean";
+                    break;
+                case "bool?":
+                    tsProperty.TypeName = "boolean | null";
+                    break;
+                case "short":
+                case "int":
+                case "long":
+                case "float":
+                case "double":
+                case "decimal":
+                    tsProperty.TypeName = "number";
+                    break;
+                case "short?":
+                case "int?":
+                case "long?":
+                case "float?":
+                case "double?":
+                case "decimal?":
+                    tsProperty.TypeName = "number | null";
+                    break;
+                default:
+                    tsProperty.TypeName = "any";
+                    break;
+            }
+            #endregion
+            return tsProperty;
+        }
+
         public static GenerateNode Add(this List<GenerateNode> nodes, string key, string value)
         {
             GenerateNode newNode = new GenerateNode(key, value);

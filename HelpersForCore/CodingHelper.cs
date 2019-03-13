@@ -1,7 +1,10 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,6 +12,36 @@ namespace HelpersForCore
 {
     public class CodingHelper
     {
+        /// <summary>
+        /// 從程式碼讀出 class 的結構
+        /// </summary>
+        public static CsSchemaClass AnalysisClass(string programText)
+        {
+            CsSchemaClass csClass = new CsSchemaClass();
+            List<CsSchemaProperty> csProperties = new List<CsSchemaProperty>();
+            SyntaxTree tree = CSharpSyntaxTree.ParseText(programText);
+            CompilationUnitSyntax root = tree.GetRoot() as CompilationUnitSyntax;
+            ClassDeclarationSyntax classSyntax =
+                root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+            IEnumerable<PropertyDeclarationSyntax> propertiesSyntax =
+                classSyntax.DescendantNodes().OfType<PropertyDeclarationSyntax>();
+            foreach (var propertySyntax in propertiesSyntax)
+            {
+                PredefinedTypeSyntax typeSyntax =
+                    propertySyntax.DescendantNodes().OfType<PredefinedTypeSyntax>().Single();
+                SyntaxToken type = typeSyntax.Keyword;
+                SyntaxToken property = propertySyntax.Identifier;
+                csProperties.Add(new CsSchemaProperty()
+                {
+                    Name = property.Text,
+                    TypeName = type.Text
+                });
+            }
+            csClass.Name = classSyntax.Identifier.Text;
+            csClass.Properties = csProperties.ToArray();
+            return csClass;
+        }
+
         /// <summary>
         /// 取得資料庫的所有資料表名稱
         /// </summary>
@@ -21,26 +54,14 @@ namespace HelpersForCore
                 WHERE [type] = 'U'").Select(x => Convert.ToString(x));
         }
 
-        public static DbTableSchema GetDbTableSchemaByContext(string context)
-        {
-            DbTableSchema schema = new DbTableSchema();
-            IEnumerable<string> rows = context.Replace("\r\n", "\n").Split('\n').Where(x => string.IsNullOrWhiteSpace(x) == false);
-            foreach (string row in rows)
-            {
-                // TODO:
-            }
-            return schema;
-        }
-
         /// <summary>
         /// 取得 DB Table 的結構資訊
         /// </summary>
-        public static DbTableSchema GetDbTableSchema(string connectionString, string tableName)
+        public static DbSchemaTable GetDbTableSchema(string connectionString, string tableName)
         {
             SqlHelper sqlHelper = new SqlHelper(connectionString);
-            DbTableSchema schema = new DbTableSchema();
-            schema.TableName = tableName;
-            schema.ForCs.ModelName = tableName;
+            DbSchemaTable schema = new DbSchemaTable();
+            schema.Name = tableName;
             schema.Fields = sqlHelper.ExecuteDataTable(@"
                 SELECT c.NAME                      AS NAME, 
                        t.NAME                      AS TypeName, 
@@ -88,14 +109,10 @@ namespace HelpersForCore
                        AND o.NAME = @TableName 
                 ORDER  BY sc.colorder ",
                 new System.Data.SqlClient.SqlParameter("@TableName", tableName))
-                .Rows.ToObjects<DbTableSchema.Field>();
-            foreach (DbTableSchema.Field field in schema.Fields)
+                .Rows.ToObjects<DbSchemaField>().ToArray();
+            foreach (DbSchemaField field in schema.Fields)
             {
                 field.TypeFullName = GetDbTypeFullName(field);
-                field.ForCs.EFAttributes = GetCsEFAttributes(field);
-                field.ForCs.TypeName = GetCsTypeName(field);
-                field.ForTs.TypeName = GetTsTypeName(field);
-                field.ForTs.DefaultValue = GetTsDefaultValue(field);
             }
             return schema;
         }
@@ -103,7 +120,7 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB 多個 Table 的結構資訊
         /// </summary>
-        public static IEnumerable<DbTableSchema> GetDbTableSchema(string connectionString, IEnumerable<string> tableNames)
+        public static IEnumerable<DbSchemaTable> GetDbTableSchema(string connectionString, IEnumerable<string> tableNames)
         {
             return tableNames.Select(x => GetDbTableSchema(connectionString, x));
         }
@@ -111,7 +128,7 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB 欄位包含長度的類型名稱
         /// </summary>
-        public static string GetDbTypeFullName(DbTableSchema.Field field)
+        public static string GetDbTypeFullName(DbSchemaField field)
         {
             switch (field.TypeName)
             {
@@ -130,194 +147,6 @@ namespace HelpersForCore
                     return $"{field.TypeName}({field.Prec}, {field.Scale})";
                 default:
                     return field.TypeName;
-            }
-        }
-
-        public static IEnumerable<string> GetCsEFAttributes(DbTableSchema.Field field)
-        {
-            List<string> attributes = new List<string>();
-            if (field.IsIdentity)
-            {
-                attributes.Add("[Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-            }
-            if (field.TypeName.In("char", "nchar", "ntext", "nvarchar", "text", "varchar", "xml"))
-            {
-                if (field.IsNullable == false)
-                {
-                    attributes.Add("[Required]");
-                }
-                attributes.Add($@"[Column(""{field.Name}"")]");
-                if (field.Length > 0)
-                {
-                    attributes.Add($"[StringLength({field.Length})]");
-                }
-            }
-            else
-            {
-                attributes.Add($@"[Column(""{field.Name}"", TypeName = ""{field.TypeFullName}"")]");
-            }
-            return attributes;
-        }
-
-        /// <summary>
-        /// 取得對應 DB 類別的 CSharp 類別名稱
-        /// </summary>
-        public static string GetCsTypeName(DbTableSchema.Field field)
-        {
-            switch (field.TypeName)
-            {
-                case "bigint":
-                    return $"long{(field.IsNullable ? "?" : "")}";
-                case "binary":
-                    return "byte[]";
-                case "bit":
-                    return $"bool{(field.IsNullable ? "?" : "")}";
-                case "char":
-                    return "string";
-                case "date":
-                case "datetime":
-                case "datetime2":
-                    return $"DateTime{(field.IsNullable ? "?" : "")}";
-                case "datetimeoffset":
-                    return $"DateTimeOffset{(field.IsNullable ? "?" : "")}";
-                case "decimal":
-                    return $"decimal{(field.IsNullable ? "?" : "")}";
-                case "float":
-                    return $"double{(field.IsNullable ? "?" : "")}";
-                //case "geography":
-                //    return "";
-                //case "geometry":
-                //    return "";
-                //case "hierarchyid":
-                //    return "";
-                case "image":
-                    return "byte[]";
-                case "int":
-                    return $"int{(field.IsNullable ? "?" : "")}";
-                case "money":
-                    return $"decimal{(field.IsNullable ? "?" : "")}";
-                case "nchar":
-                    return "string";
-                case "ntext":
-                    return "string";
-                case "numeric":
-                    return $"decimal{(field.IsNullable ? "?" : "")}";
-                case "nvarchar":
-                    return "string";
-                case "real":
-                    return $"float{(field.IsNullable ? "?" : "")}";
-                case "smalldatetime":
-                    return $"DateTime{(field.IsNullable ? "?" : "")}";
-                case "smallint":
-                    return $"short{(field.IsNullable ? "?" : "")}";
-                case "smallmoney":
-                    return $"decimal{(field.IsNullable ? "?" : "")}";
-                case "sql_variant":
-                    return "object";
-                case "text":
-                    return "string";
-                case "time":
-                    return $"TimeSpan{(field.IsNullable ? "?" : "")}";
-                case "timestamp":
-                    return "byte[]";
-                case "tinyint":
-                    return $"byte{(field.IsNullable ? "?" : "")}";
-                case "uniqueidentifier":
-                    return $"Guid{(field.IsNullable ? "?" : "")}";
-                case "varbinary":
-                    return "byte[]";
-                case "varchar":
-                    return "string";
-                case "xml":
-                    return "string";
-                default:
-                    return null;
-            }
-        }
-
-        public static string GetTsTypeName(DbTableSchema.Field field)
-        {
-            switch (field.TypeName)
-            {
-                case "bigint":
-                    return "number";
-                case "binary":
-                    return "any";
-                case "bit":
-                    return "boolean";
-                case "char":
-                    return "string";
-                case "date":
-                case "datetime":
-                case "datetime2":
-                    return "Date";
-                case "datetimeoffset":
-                    return "any";
-                case "decimal":
-                case "float":
-                    return "number";
-                case "geography":
-                    return "any";
-                case "geometry":
-                    return "any";
-                case "hierarchyid":
-                    return "any";
-                case "image":
-                    return "any";
-                case "int":
-                case "money":
-                    return "number";
-                case "nchar":
-                case "ntext":
-                    return "string";
-                case "numeric":
-                    return "number";
-                case "nvarchar":
-                    return "string";
-                case "real":
-                    return "number";
-                case "smalldatetime":
-                    return "Date";
-                case "smallint":
-                    return "number";
-                case "smallmoney":
-                    return "number";
-                case "sql_variant":
-                    return "any";
-                case "text":
-                    return "string";
-                case "time":
-                    return "any";
-                case "timestamp":
-                    return "any";
-                case "tinyint":
-                    return "any";
-                case "uniqueidentifier":
-                    return "any";
-                case "varbinary":
-                    return "any";
-                case "varchar":
-                    return "string";
-                case "xml":
-                    return "string";
-                default:
-                    return null;
-            }
-        }
-
-        public static string GetTsDefaultValue(DbTableSchema.Field field)
-        {
-            switch (field.ForTs.TypeName)
-            {
-                case "boolean":
-                    return "false";
-                case "number":
-                    return "0";
-                case "string":
-                    return "\"\"";
-                case "any":
-                default:
-                    return "null";
             }
         }
 

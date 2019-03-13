@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -625,6 +627,33 @@ namespace HelpersForCore
                 }
             }
             return result;
+        }
+
+        public static string ProcessStart(string fileName, string[] arguments)
+        {
+            string result = "";
+            using (Process process = new Process())
+            {
+                StringBuilder builder = new StringBuilder();
+                process.StartInfo.FileName = fileName;
+                process.StartInfo.Arguments = string.Join(" ", arguments.Select(x => $"\"{x.Replace("\\", "\\\\").Replace("\"", "\\\"")}\""));
+                process.StartInfo.RedirectStandardOutput = true;
+                process.OutputDataReceived += (sender, e) => builder.Append(e.Data);
+                process.Start();
+                process.BeginOutputReadLine();
+                process.WaitForExit();
+                result = builder.ToString();
+            }
+            return result;
+        }
+
+        public static T ProcessStart<T>(string fileName, string[] arguments, Func<string, T> converter = null)
+        {
+            if (converter == null)
+            {
+                converter = JsonConvert.DeserializeObject<T>;
+            }
+            return converter(ProcessStart(fileName, arguments));
         }
     }
 }
