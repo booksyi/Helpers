@@ -79,6 +79,12 @@ namespace HelpersForCore
         public string Name { get; set; }
     }
 
+    public class TsSchemaClass
+    {
+        public string Name { get; set; }
+        public TsSchemaProperty[] Properties { get; set; }
+    }
+
     public class TsSchemaProperty
     {
         public string TypeName { get; set; }
@@ -182,7 +188,9 @@ namespace HelpersForCore
             public string Name { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string Description { get; set; }
+            public string DisplayName { get; set; }
+
+            public InputType InputType { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
             public bool IsRequired { get; set; }
@@ -205,9 +213,9 @@ namespace HelpersForCore
                 Name = name;
             }
 
-            public Input HasDescription(string description)
+            public Input HasDisplayName(string displayName)
             {
-                Description = description;
+                DisplayName = displayName;
                 return this;
             }
 
@@ -241,7 +249,9 @@ namespace HelpersForCore
             public string Name { get; set; }
 
             [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-            public string Description { get; set; }
+            public string DisplayName { get; set; }
+
+            public InputType InputType { get; set; }
 
             [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
             public bool IsRequired { get; set; }
@@ -261,9 +271,9 @@ namespace HelpersForCore
                 Name = name;
             }
 
-            public InputChild HasDescription(string description)
+            public InputChild HasDisplayName(string displayName)
             {
-                Description = description;
+                DisplayName = displayName;
                 return this;
             }
 
@@ -526,6 +536,21 @@ namespace HelpersForCore
             public TransactionParameterNode[] TransactionParameterNodes { get; set; }
         }
         #endregion
+
+        [JsonConverter(typeof(StringEnumConverter))]
+        public enum InputType
+        {
+            [EnumMember(Value = "textbox")]
+            TextBox,
+
+            [EnumMember(Value = "textarea")]
+            TextArea,
+
+            [EnumMember(Value = "truefalse")]
+            TrueFalse,
+
+
+        }
 
         [JsonConverter(typeof(StringEnumConverter))]
         public enum RequestFrom

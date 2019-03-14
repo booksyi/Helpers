@@ -162,11 +162,19 @@ namespace HelpersForCore
             return csProperty;
         }
 
+        public static TsSchemaClass ToTsClass(this CsSchemaClass csClass)
+        {
+            TsSchemaClass tsClass = new TsSchemaClass();
+            tsClass.Name = csClass.Name;
+            tsClass.Properties = csClass.Properties.Select(x => x.ToTsProperty()).ToArray();
+            return tsClass;
+        }
+
         public static TsSchemaProperty ToTsProperty(this CsSchemaProperty csProperty)
         {
             TsSchemaProperty tsProperty = new TsSchemaProperty();
             #region convert type
-            tsProperty.Name = csProperty.Name;
+            tsProperty.Name = csProperty.Name.LowerFirst();
             switch (csProperty.TypeName)
             {
                 case "string":
@@ -483,7 +491,7 @@ namespace HelpersForCore
                     adapterNode.Url,
                     adapterNode.RequestNodes?
                         .ToDictionary(x => x.Name, x => x.ToJToken(input, adapter))
-                        .ToJObject(input));
+                        .ToJObject());
                 json = await response.Content.ReadAsStringAsync();
             }
             JToken jToken = CSharpHelper.Try(() => JToken.Parse(json), x => x, () => json);
@@ -560,6 +568,11 @@ namespace HelpersForCore
                 if (temp.Contains(input.Name))
                 {
                     errors.Add($"Input 名稱重複: {input.Name}");
+                }
+                if (input.InputType == CodeTemplate.InputType.TrueFalse)
+                {
+                    // TrueFalse 不允許多值
+                    input.IsMultiple = false;
                 }
                 if (input.Children != null)
                 {

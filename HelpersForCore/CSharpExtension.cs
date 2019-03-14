@@ -843,7 +843,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 Dictionary 轉成 JObject
         /// </summary>
-        public static JObject ToJObject(this Dictionary<string, JToken> dictionary, JObject request)
+        public static JObject ToJObject(this Dictionary<string, JToken> dictionary)
         {
             JObject jObject = new JObject();
             foreach (var query in dictionary)
@@ -855,7 +855,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將 Dictionary 轉成 JObject
         /// </summary>
-        public static JObject ToJObject<T>(this Dictionary<string, T> dictionary, JObject request)
+        public static JObject ToJObject<T>(this Dictionary<string, T> dictionary)
         {
             JObject jObject = new JObject();
             foreach (var query in dictionary)
