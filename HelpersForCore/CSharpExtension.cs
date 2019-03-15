@@ -871,15 +871,18 @@ namespace HelpersForCore
         public static JObject ToJObject(this IQueryCollection query)
         {
             JObject jObject = new JObject();
-            foreach (var param in query)
+            if (query != null)
             {
-                if (param.Value.Count == 1)
+                foreach (var param in query)
                 {
-                    jObject.Add(param.Key, JToken.FromObject(param.Value.First()));
-                }
-                else
-                {
-                    jObject.Add(param.Key, JToken.FromObject(param.Value));
+                    if (param.Value.Count == 1)
+                    {
+                        jObject.Add(param.Key, JToken.FromObject(param.Value.First()));
+                    }
+                    else
+                    {
+                        jObject.Add(param.Key, JToken.FromObject(param.Value));
+                    }
                 }
             }
             return jObject;
@@ -903,6 +906,28 @@ namespace HelpersForCore
             return null;
         }
         /// <summary>
+        /// 將 Request.Body 轉成 JToken
+        /// </summary>
+        public static async Task<JToken> ToJTokenAsync(this Stream body, Encoding encoding = null)
+        {
+            if (body.CanRead)
+            {
+                if (body.CanSeek)
+                {
+                    body.Seek(0, SeekOrigin.Begin);
+                }
+                using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
+                {
+                    string json = await reader.ReadToEndAsync();
+                    if (string.IsNullOrWhiteSpace(json) == false)
+                    {
+                        return JToken.Parse(json);
+                    }
+                }
+            }
+            return null;
+        }
+        /// <summary>
         /// 將 Request.Body 轉成 JObject
         /// </summary>
         public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
@@ -916,7 +941,10 @@ namespace HelpersForCore
                 using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
                 {
                     string json = await reader.ReadToEndAsync();
-                    return JObject.Parse(json);
+                    if (string.IsNullOrWhiteSpace(json) == false)
+                    {
+                        return JObject.Parse(json);
+                    }
                 }
             }
             return null;

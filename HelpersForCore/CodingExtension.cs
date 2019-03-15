@@ -487,11 +487,22 @@ namespace HelpersForCore
             }
             else if (adapterNode.HttpMethod == CodeTemplate.HttpMethod.Post)
             {
-                var response = await client.PostAsJsonAsync(
-                    adapterNode.Url,
-                    adapterNode.RequestNodes?
+                JToken postData;
+                if (adapterNode.RequestNodes != null
+                    && adapterNode.RequestNodes.Count() == 1
+                    && string.IsNullOrWhiteSpace(adapterNode.RequestNodes.First().Name))
+                {
+                    // 當 Adapter 只有一個名稱為空白的 RequestNode 時，將 RequestNode 的結果當作 Post 的資料
+                    postData = adapterNode.RequestNodes.First().ToJToken(input, adapter);
+                }
+                else
+                {
+                    postData = adapterNode.RequestNodes?
                         .ToDictionary(x => x.Name, x => x.ToJToken(input, adapter))
-                        .ToJObject());
+                        .ToJObject();
+                }
+                var response = await client.PostAsJsonAsync(
+                    adapterNode.Url, postData);
                 json = await response.Content.ReadAsStringAsync();
             }
             JToken jToken = CSharpHelper.Try(() => JToken.Parse(json), x => x, () => json);
