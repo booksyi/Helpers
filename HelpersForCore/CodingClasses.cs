@@ -38,6 +38,34 @@ namespace HelpersForCore
         public string Description { get; set; }
     }
 
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum CsSchemaAccess
+    {
+        [EnumMember(Value = "public")]
+        Public,
+
+        [EnumMember(Value = "protected")]
+        Protected,
+
+        [EnumMember(Value = "internal")]
+        Internal,
+
+        [EnumMember(Value = "protected internal")]
+        ProtectedInternal,
+
+        [EnumMember(Value = "private")]
+        Private,
+
+        [EnumMember(Value = "private protected")]
+        PrivateProtected
+    }
+
+    public class CsSchemaUnit
+    {
+        public List<string> Usings { get; private set; } = new List<string>();
+        public List<CsSchemaNamespace> Namespaces { get; private set; } = new List<CsSchemaNamespace>();
+    }
+
     public class CsSchemaValue
     {
         public string Value { get; set; }
@@ -65,16 +93,35 @@ namespace HelpersForCore
         }
     }
 
+    public class CsSchemaNamespace
+    {
+        public string Namespace { get; set; }
+        public List<CsSchemaClass> Classes { get; private set; } = new List<CsSchemaClass>();
+        public CsSchemaNamespace() { }
+        public CsSchemaNamespace(string @namespace) { Namespace = @namespace; }
+    }
+
     public class CsSchemaClass
     {
-        public string Name { get; set; }
         public CsSchemaAttribute[] Attributes { get; set; }
+        public CsSchemaAccess Access { get; set; }
+        public string Name { get; set; }
+        public CsSchemaField[] Fields { get; set; }
         public CsSchemaProperty[] Properties { get; set; }
+    }
+
+    public class CsSchemaField
+    {
+        public CsSchemaAttribute[] Attributes { get; set; }
+        public CsSchemaAccess Access { get; set; }
+        public string TypeName { get; set; }
+        public string Name { get; set; }
     }
 
     public class CsSchemaProperty
     {
         public CsSchemaAttribute[] Attributes { get; set; }
+        public CsSchemaAccess Access { get; set; }
         public string TypeName { get; set; }
         public string Name { get; set; }
     }

@@ -13,45 +13,6 @@ namespace HelpersForCore
 {
     public class CSharpHelper
     {
-        static readonly Dictionary<(Type, Type), Func<object, object>> Mappers = new Dictionary<(Type, Type), Func<object, object>>();
-
-        /// <summary>
-        /// 建立兩個類型單向的轉換方法
-        /// </summary>
-        public static void Mapper<T1, T2>(Func<object, object> func)
-            where T1 : class
-            where T2 : class
-        {
-            Type type1 = typeof(T1);
-            Type type2 = typeof(T2);
-            var key = (type1, type2);
-            if (Mappers.ContainsKey(key))
-            {
-                Mappers[key] = func;
-            }
-            else
-            {
-                Mappers.Add(key, func);
-            }
-        }
-        /// <summary>
-        /// 依照以建立的類型轉換方法做類型的轉換
-        /// </summary>
-        public static T2 Map<T1, T2>(T1 source)
-            where T1 : class
-            where T2 : class
-        {
-            Type type1 = typeof(T1);
-            Type type2 = typeof(T2);
-            var key = (type1, type2);
-            if (Mappers.ContainsKey(key))
-            {
-                var func = Mappers[key];
-                return func(source) as T2;
-            }
-            return default(T2);
-        }
-        
         /// <summary>
         /// 傳回一個隨機順序的陣列
         /// </summary>
