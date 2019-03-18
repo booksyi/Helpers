@@ -252,6 +252,28 @@ namespace HelpersForCore
             }
         }
 
+        /// <summary>
+        /// 取得 ApplyValue 的值或透過 ApplyApi 取得範本
+        /// </summary>
+        public static async Task<string> ReadAsStringAsync(this GenerateNode node)
+        {
+            if (string.IsNullOrWhiteSpace(node.ApplyValue) == false)
+            {
+                return node.ApplyValue;
+            }
+            if (string.IsNullOrWhiteSpace(node.ApplyApi) == false)
+            {
+                HttpClient client = new HttpClient();
+                var message = await client.GetAsync(node.ApplyApi);
+                if (message.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    return await message.Content.ReadAsStringAsync();
+                }
+                throw new GenerateException($"HttpGet {node.ApplyApi} Failed ({message.StatusCode}).");
+            }
+            return node.ApplyValue;
+        }
+
         public static Dictionary<string, string> GenerateSynonyms = new Dictionary<string, string>
         {
             { "@@Space", " " },
@@ -266,7 +288,7 @@ namespace HelpersForCore
         /// </summary>
         public static async Task<string> GenerateAsync(this GenerateNode root)
         {
-            string result = await root.GetApplyTextAsync();
+            string result = await root.ReadAsStringAsync();
             if (string.IsNullOrWhiteSpace(result))
             {
                 return null;
@@ -324,7 +346,7 @@ namespace HelpersForCore
                                             {
                                                 return await GenerateAsync(node);
                                             }
-                                            return await node.GetApplyTextAsync();
+                                            return await node.ReadAsStringAsync();
                                         })));
                         }
                         if (string.IsNullOrWhiteSpace(value))
@@ -378,7 +400,7 @@ namespace HelpersForCore
         {
             if (string.IsNullOrWhiteSpace(node.ApplyApi))
             {
-                return JToken.FromObject(await node.GetApplyTextAsync());
+                return JToken.FromObject(await node.ReadAsStringAsync());
             }
             else
             {
@@ -396,7 +418,7 @@ namespace HelpersForCore
                                     jObject.Add(
                                         groupParameters.Key,
                                         JToken.FromObject(
-                                            await groupParameters.First().GetApplyTextAsync()));
+                                            await groupParameters.First().ReadAsStringAsync()));
                                 }
                                 else
                                 {
@@ -432,6 +454,10 @@ namespace HelpersForCore
             }
             else if (requestNode.From == CodeTemplate.RequestFrom.Input)
             {
+                if (string.IsNullOrWhiteSpace(requestNode.InputName))
+                {
+                    throw new GenerateException("RequestNode.From 為 Input 時必須有 InputName");
+                }
                 // 處理 InputName 以 | 區隔，來依序尋找不為 null 或 Empty 的值
                 string[] inputNames = requestNode.InputName.Split('|').Select(x => x.Trim()).ToArray();
                 foreach (string inputName in inputNames)
@@ -451,6 +477,10 @@ namespace HelpersForCore
             }
             else if (requestNode.From == CodeTemplate.RequestFrom.Adapter)
             {
+                if (string.IsNullOrWhiteSpace(requestNode.AdapterName))
+                {
+                    throw new GenerateException("RequestNode.From 為 Adapter 時必須有 AdapterName");
+                }
                 // 處理 AdapterProperty 以 . 區隔，來向下層尋找成員
                 JToken jToken = adapter?.Property(requestNode.AdapterName, StringComparison.CurrentCultureIgnoreCase)?.Value;
                 if (!string.IsNullOrWhiteSpace(requestNode.AdapterProperty) && jToken is JObject jObject)
@@ -503,9 +533,24 @@ namespace HelpersForCore
                 }
                 var response = await client.PostAsJsonAsync(
                     adapterNode.Url, postData);
-                json = await response.Content.ReadAsStringAsync();
+                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    json = await response.Content.ReadAsStringAsync();
+                }
+                else
+                {
+                    throw new GenerateException($"AdapterNode Post 到 {adapterNode.Url} 的回傳結果不成功，Post Data = {postData}");
+                }
             }
-            JToken jToken = CSharpHelper.Try(() => JToken.Parse(json), x => x, () => json);
+            JToken jToken;
+            try
+            {
+                jToken = JToken.Parse(json);
+            }
+            catch (Exception)
+            {
+                throw new GenerateException($"AdapterNode Post 到 {adapterNode.Url} 的回傳結果 {json} 無法反序列化");
+            }
             if (jToken is JObject jObject)
             {
                 return jObject.Confine(adapterNode.ResponseConfine);
@@ -951,7 +996,7 @@ namespace HelpersForCore
                         JProperty jProperty = jObject.Property(confine, StringComparison.CurrentCultureIgnoreCase);
                         if (jProperty == null)
                         {
-                            break;
+                            throw new GenerateException($"物件 {source} 限縮到 {propertyConfine} 時失敗，無法找到成員 {confine}");
                         }
                         adapterPropertyObject.Add(jProperty.Name, new JObject());
                         adapterProperty = adapterPropertyObject.Property(jProperty.Name);

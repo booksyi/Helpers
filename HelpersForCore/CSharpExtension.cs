@@ -928,26 +928,11 @@ namespace HelpersForCore
             return null;
         }
         /// <summary>
-        /// 將 Request.Body 轉成 JObject
+        /// 將 Request.Body 轉成繼承 JToken 的類型
         /// </summary>
-        public static async Task<JObject> ToJObjectAsync(this Stream body, Encoding encoding = null)
+        public static async Task<T> ToJTokenAsync<T>(this Stream body, Encoding encoding = null) where T : JToken
         {
-            if (body.CanRead)
-            {
-                if (body.CanSeek)
-                {
-                    body.Seek(0, SeekOrigin.Begin);
-                }
-                using (StreamReader reader = new StreamReader(body, encoding ?? Encoding.UTF8))
-                {
-                    string json = await reader.ReadToEndAsync();
-                    if (string.IsNullOrWhiteSpace(json) == false)
-                    {
-                        return JObject.Parse(json);
-                    }
-                }
-            }
-            return null;
+            return (await body.ToJTokenAsync(encoding)) as T;
         }
         /// <summary>
         /// 將 Request.Body 轉成自訂的 Class

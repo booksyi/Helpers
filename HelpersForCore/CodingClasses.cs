@@ -106,35 +106,6 @@ namespace HelpersForCore
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public GenerateNodeSettings Settings { get; set; }
 
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
-        public string ApplyExceptionMessage { get; set; }
-
-        /// <summary>
-        /// 取得 ApplyValue 的值或透過 ApplyApi 取得範本
-        /// </summary>
-        public async Task<string> GetApplyTextAsync()
-        {
-            if (string.IsNullOrWhiteSpace(ApplyValue) == false)
-            {
-                return ApplyValue;
-            }
-            if (string.IsNullOrWhiteSpace(ApplyApi) == false)
-            {
-                HttpClient client = new HttpClient();
-                var message = await client.GetAsync(ApplyApi);
-                if (message.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    return await message.Content.ReadAsStringAsync();
-                }
-                else
-                {
-                    ApplyExceptionMessage = $"HttpGet {ApplyApi} Failed ({message.StatusCode}).";
-                    return null;
-                }
-            }
-            return ApplyValue;
-        }
-
         public GenerateNode() { }
         public GenerateNode(string key)
         {
@@ -174,6 +145,12 @@ namespace HelpersForCore
         /// 參數設定預設值的保留字
         /// </summary>
         public string WithDefault { get; set; }
+    }
+
+    public class GenerateException : Exception
+    {
+        public GenerateException() : base() { }
+        public GenerateException(string message) : base(message) { }
     }
 
     public class CodeTemplate
