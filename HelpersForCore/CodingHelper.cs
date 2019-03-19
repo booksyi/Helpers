@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AutoMapper;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
@@ -12,13 +13,26 @@ namespace HelpersForCore
 {
     public class CodingHelper
     {
+        private readonly IMapper mapper;
+        public CodingHelper(IMapper mapper)
+        {
+            this.mapper = mapper;
+        }
+
+        public string GenerateCode(CsSchema.Unit unit)
+        {
+            var syntax = mapper.Map<CompilationUnitSyntax>(unit);
+            return syntax.NormalizeWhitespace().ToFullString();
+        }
+
+        #region Static Methods
         /// <summary>
         /// 從程式碼讀出 class 的結構
         /// </summary>
-        public static CsSchemaClass AnalysisClass(string programText)
+        public static CsSchema.Class AnalysisClass(string programText)
         {
-            CsSchemaClass csClass = new CsSchemaClass();
-            List<CsSchemaProperty> csProperties = new List<CsSchemaProperty>();
+            CsSchema.Class csClass = new CsSchema.Class();
+            List<CsSchema.Property> csProperties = new List<CsSchema.Property>();
             SyntaxTree tree = CSharpSyntaxTree.ParseText(programText);
             CompilationUnitSyntax root = tree.GetRoot() as CompilationUnitSyntax;
             ClassDeclarationSyntax classSyntax =
@@ -31,7 +45,7 @@ namespace HelpersForCore
                     propertySyntax.DescendantNodes().OfType<PredefinedTypeSyntax>().Single();
                 SyntaxToken type = typeSyntax.Keyword;
                 SyntaxToken property = propertySyntax.Identifier;
-                csProperties.Add(new CsSchemaProperty()
+                csProperties.Add(new CsSchema.Property()
                 {
                     Name = property.Text,
                     TypeName = type.Text
@@ -57,10 +71,10 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB Table 的結構資訊
         /// </summary>
-        public static DbSchemaTable GetDbTableSchema(string connectionString, string tableName)
+        public static DbSchema.Table GetDbTableSchema(string connectionString, string tableName)
         {
             SqlHelper sqlHelper = new SqlHelper(connectionString);
-            DbSchemaTable schema = new DbSchemaTable();
+            DbSchema.Table schema = new DbSchema.Table();
             schema.Name = tableName;
             schema.Fields = sqlHelper.ExecuteDataTable(@"
                 SELECT c.NAME                      AS NAME, 
@@ -109,8 +123,8 @@ namespace HelpersForCore
                        AND o.NAME = @TableName 
                 ORDER  BY sc.colorder ",
                 new System.Data.SqlClient.SqlParameter("@TableName", tableName))
-                .Rows.ToObjects<DbSchemaField>().ToArray();
-            foreach (DbSchemaField field in schema.Fields)
+                .Rows.ToObjects<DbSchema.Field>().ToArray();
+            foreach (DbSchema.Field field in schema.Fields)
             {
                 field.TypeFullName = GetDbTypeFullName(field);
             }
@@ -120,7 +134,7 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB 多個 Table 的結構資訊
         /// </summary>
-        public static IEnumerable<DbSchemaTable> GetDbTableSchema(string connectionString, IEnumerable<string> tableNames)
+        public static IEnumerable<DbSchema.Table> GetDbTableSchema(string connectionString, IEnumerable<string> tableNames)
         {
             return tableNames.Select(x => GetDbTableSchema(connectionString, x));
         }
@@ -128,7 +142,7 @@ namespace HelpersForCore
         /// <summary>
         /// 取得 DB 欄位包含長度的類型名稱
         /// </summary>
-        public static string GetDbTypeFullName(DbSchemaField field)
+        public static string GetDbTypeFullName(DbSchema.Field field)
         {
             switch (field.TypeName)
             {
@@ -187,5 +201,6 @@ namespace HelpersForCore
                     return null;
             }
         }
+        #endregion
     }
 }

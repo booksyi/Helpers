@@ -82,16 +82,16 @@ namespace HelpersForCore
             System.Diagnostics.Debug.WriteLine($@"
                 ----Connection String-----------------------------
                 -- {connectionString.Replace("\r\n", "\n").Replace("\n", " ")}
-                ----Parameters------------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
+                ----Parameters------------------------------------".RemoveHeadEmptyLines().DecreaseIndent());
             foreach (SqlParameter parameter in cmd.Parameters)
             {
                 DebugWrite(parameter);
             }
             System.Diagnostics.Debug.WriteLine($@"
-                ----Command Text----------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
-            System.Diagnostics.Debug.WriteLine(cmd.CommandText.RemoneHeadEmptyLines().DecreaseIndent());
+                ----Command Text----------------------------------".RemoveHeadEmptyLines().DecreaseIndent());
+            System.Diagnostics.Debug.WriteLine(cmd.CommandText.RemoveHeadEmptyLines().DecreaseIndent());
             System.Diagnostics.Debug.WriteLine($@"
-                ----End-------------------------------------------".RemoneHeadEmptyLines().DecreaseIndent());
+                ----End-------------------------------------------".RemoveHeadEmptyLines().DecreaseIndent());
         }
 
         /// <summary>

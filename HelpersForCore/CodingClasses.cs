@@ -11,131 +11,138 @@ using System.Threading.Tasks;
 
 namespace HelpersForCore
 {
-    public class DbSchemaTable
+    public class DbSchema
     {
-        public string Name { get; set; }
-        public DbSchemaField[] Fields { get; set; }
-
-        public DbSchemaField Identity { get => Fields.FirstOrDefault(x => x.IsIdentity); }
-        public DbSchemaField[] PrimaryKeys { get => Fields.Where(x => x.IsPrimaryKey).ToArray(); }
-    }
-
-    public class DbSchemaField
-    {
-        public string Title { get; set; }
-        public string Name { get; set; }
-        public string TypeName { get; set; }
-        public string TypeFullName { get; set; }
-        public bool IsNullable { get; set; }
-        public bool IsIdentity { get; set; }
-        public bool IsUnique { get; set; }
-        public bool IsPrimaryKey { get; set; }
-        public bool IsForeignKey { get; set; }
-        public bool IsReferencedForeignKey { get; set; }
-        public int Length { get; set; }
-        public int Prec { get; set; }
-        public int Scale { get; set; }
-        public string Description { get; set; }
-    }
-
-    [JsonConverter(typeof(StringEnumConverter))]
-    public enum CsSchemaAccess
-    {
-        [EnumMember(Value = "public")]
-        Public,
-
-        [EnumMember(Value = "protected")]
-        Protected,
-
-        [EnumMember(Value = "internal")]
-        Internal,
-
-        [EnumMember(Value = "protected internal")]
-        ProtectedInternal,
-
-        [EnumMember(Value = "private")]
-        Private,
-
-        [EnumMember(Value = "private protected")]
-        PrivateProtected
-    }
-
-    public class CsSchemaUnit
-    {
-        public List<string> Usings { get; private set; } = new List<string>();
-        public List<CsSchemaNamespace> Namespaces { get; private set; } = new List<CsSchemaNamespace>();
-    }
-
-    public class CsSchemaValue
-    {
-        public string Value { get; set; }
-        public bool IsString { get; set; }
-        public CsSchemaValue(string value, bool isString = true)
+        public class Table
         {
-            Value = value;
-            IsString = isString;
+            public string Name { get; set; }
+            public Field[] Fields { get; set; }
+
+            public Field Identity { get => Fields.FirstOrDefault(x => x.IsIdentity); }
+            public Field[] PrimaryKeys { get => Fields.Where(x => x.IsPrimaryKey).ToArray(); }
         }
-        public CsSchemaValue(object value, bool isString = false)
+
+        public class Field
         {
-            Value = Convert.ToString(value);
-            IsString = isString;
+            public string Title { get; set; }
+            public string Name { get; set; }
+            public string TypeName { get; set; }
+            public string TypeFullName { get; set; }
+            public bool IsNullable { get; set; }
+            public bool IsIdentity { get; set; }
+            public bool IsUnique { get; set; }
+            public bool IsPrimaryKey { get; set; }
+            public bool IsForeignKey { get; set; }
+            public bool IsReferencedForeignKey { get; set; }
+            public int Length { get; set; }
+            public int Prec { get; set; }
+            public int Scale { get; set; }
+            public string Description { get; set; }
         }
     }
 
-    public class CsSchemaAttribute
+    public class CsSchema
     {
-        public string Name { get; set; }
-        public Dictionary<string, CsSchemaValue> ConstructorParameters { get; set; }
-        public Dictionary<string, CsSchemaValue> Properties { get; set; }
-        public CsSchemaAttribute(string name)
+        /// <summary>
+        /// 存取修飾子
+        /// </summary>
+        [JsonConverter(typeof(StringEnumConverter))]
+        public enum Access
         {
-            Name = name;
+            [EnumMember(Value = "none")]
+            None,
+
+            [EnumMember(Value = "public")]
+            Public,
+
+            [EnumMember(Value = "protected")]
+            Protected,
+
+            [EnumMember(Value = "internal")]
+            Internal,
+
+            [EnumMember(Value = "protected internal")]
+            ProtectedInternal,
+
+            [EnumMember(Value = "private")]
+            Private,
+
+            [EnumMember(Value = "private protected")]
+            PrivateProtected
+        }
+
+        public class Unit
+        {
+            public string[] Usings { get; set; }
+            public Namespace[] Namespaces { get; set; }
+        }
+
+        public class Namespace
+        {
+            public string Name { get; set; }
+            public Class[] Classes { get; set; }
+            public Namespace() { }
+            public Namespace(string @namespace) { Name = @namespace; }
+        }
+
+        public class Class
+        {
+            public Attribute[] Attributes { get; set; }
+            public Access Access { get; set; }
+            public string Name { get; set; }
+            public string[] InheritTypeNames { get; set; }
+            public Field[] Fields { get; set; }
+            public Property[] Properties { get; set; }
+            public Class[] Classes { get; set; }
+            public Class() { }
+            public Class(string name) { Name = name; }
+        }
+
+        public class Field
+        {
+            public Attribute[] Attributes { get; set; }
+            public Access Access { get; set; }
+            public string TypeName { get; set; }
+            public string Name { get; set; }
+            public Field() { }
+            public Field(string typeName, string name) { TypeName = typeName; Name = name; }
+        }
+
+        public class Property
+        {
+            public Attribute[] Attributes { get; set; }
+            public Access Access { get; set; }
+            public string TypeName { get; set; }
+            public string Name { get; set; }
+            public Property() { }
+            public Property(string typeName, string name) { TypeName = typeName; Name = name; }
+        }
+
+        public class Attribute
+        {
+            public string Name { get; set; }
+            public string[] ArgumentExpressions { get; set; }
+            public Attribute(string name, params string[] expressions)
+            {
+                Name = name;
+                ArgumentExpressions = expressions;
+            }
         }
     }
 
-    public class CsSchemaNamespace
+    public class TsSchema
     {
-        public string Namespace { get; set; }
-        public List<CsSchemaClass> Classes { get; private set; } = new List<CsSchemaClass>();
-        public CsSchemaNamespace() { }
-        public CsSchemaNamespace(string @namespace) { Namespace = @namespace; }
-    }
+        public class Class
+        {
+            public string Name { get; set; }
+            public Property[] Properties { get; set; }
+        }
 
-    public class CsSchemaClass
-    {
-        public CsSchemaAttribute[] Attributes { get; set; }
-        public CsSchemaAccess Access { get; set; }
-        public string Name { get; set; }
-        public CsSchemaField[] Fields { get; set; }
-        public CsSchemaProperty[] Properties { get; set; }
-    }
-
-    public class CsSchemaField
-    {
-        public CsSchemaAttribute[] Attributes { get; set; }
-        public CsSchemaAccess Access { get; set; }
-        public string TypeName { get; set; }
-        public string Name { get; set; }
-    }
-
-    public class CsSchemaProperty
-    {
-        public CsSchemaAttribute[] Attributes { get; set; }
-        public CsSchemaAccess Access { get; set; }
-        public string TypeName { get; set; }
-        public string Name { get; set; }
-    }
-
-    public class TsSchemaClass
-    {
-        public string Name { get; set; }
-        public TsSchemaProperty[] Properties { get; set; }
-    }
-
-    public class TsSchemaProperty
-    {
-        public string TypeName { get; set; }
-        public string Name { get; set; }
+        public class Property
+        {
+            public string TypeName { get; set; }
+            public string Name { get; set; }
+        }
     }
 
     public class GenerateNode

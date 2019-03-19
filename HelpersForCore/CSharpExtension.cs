@@ -660,7 +660,7 @@ namespace HelpersForCore
         /// <summary>
         /// 將字串起始的空白行全部刪除
         /// </summary>
-        public static string RemoneHeadEmptyLines(this string sender, int max = 0)
+        public static string RemoveHeadEmptyLines(this string sender, int max = 0)
         {
             if (string.IsNullOrWhiteSpace(sender))
             {

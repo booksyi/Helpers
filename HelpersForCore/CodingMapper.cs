@@ -18,43 +18,46 @@ namespace HelpersForCore
     {
         public CodingMapperProfile()
         {
-            CreateMap<CsSchemaAccess, IEnumerable<SyntaxToken>>().ConvertUsing<CsAccessToSyntaxTokensConverter>();
-            CreateMap<CsSchemaUnit, CompilationUnitSyntax>().ConvertUsing<CsUnitToSyntaxConverter>();
-            CreateMap<CsSchemaNamespace, NamespaceDeclarationSyntax>().ConvertUsing<CsNamespaceToSyntaxConverter>();
-            CreateMap<CsSchemaClass, ClassDeclarationSyntax>().ConvertUsing<CsClassToSyntaxConverter>();
-            CreateMap<CsSchemaProperty, PropertyDeclarationSyntax>().ConvertUsing<CsPropertyToSyntaxConverter>();
-
-            CreateMap<DbSchemaTable, CsSchemaClass>().ConvertUsing<DbTableToCsClassConverter>();
-            CreateMap<DbSchemaField, CsSchemaProperty>().ConvertUsing<DbFieldToCsPropertyConverter>();
-            CreateMap<CsSchemaClass, TsSchemaClass>().ConvertUsing<CsClassToTsClassConverter>();
-            CreateMap<CsSchemaProperty, TsSchemaProperty>().ConvertUsing<CsPropertyToTsPropertyConverter>();
+            // Schema To Syntax
+            CreateMap<CsSchema.Access, IEnumerable<SyntaxToken>>().ConvertUsing<CsAccessToSyntaxTokensConverter>();
+            CreateMap<CsSchema.Unit, CompilationUnitSyntax>().ConvertUsing<CsUnitToSyntaxConverter>();
+            CreateMap<CsSchema.Namespace, NamespaceDeclarationSyntax>().ConvertUsing<CsNamespaceToSyntaxConverter>();
+            CreateMap<CsSchema.Class, ClassDeclarationSyntax>().ConvertUsing<CsClassToSyntaxConverter>();
+            CreateMap<CsSchema.Field, FieldDeclarationSyntax>().ConvertUsing<CsFieldToSyntaxConverter>();
+            CreateMap<CsSchema.Property, PropertyDeclarationSyntax>().ConvertUsing<CsPropertyToSyntaxConverter>();
+            CreateMap<CsSchema.Attribute, AttributeSyntax>().ConvertUsing<CsAttributeToSyntaxConverter>();
+            // Schema To Schema
+            CreateMap<DbSchema.Table, CsSchema.Class>().ConvertUsing<DbTableToCsClassConverter>();
+            CreateMap<DbSchema.Field, CsSchema.Property>().ConvertUsing<DbFieldToCsPropertyConverter>();
+            CreateMap<CsSchema.Class, TsSchema.Class>().ConvertUsing<CsClassToTsClassConverter>();
+            CreateMap<CsSchema.Property, TsSchema.Property>().ConvertUsing<CsPropertyToTsPropertyConverter>();
         }
     }
 
     #region Schema To Syntax Converters
-    public class CsAccessToSyntaxTokensConverter : ITypeConverter<CsSchemaAccess, IEnumerable<SyntaxToken>>
+    public class CsAccessToSyntaxTokensConverter : ITypeConverter<CsSchema.Access, IEnumerable<SyntaxToken>>
     {
-        public IEnumerable<SyntaxToken> Convert(CsSchemaAccess source, IEnumerable<SyntaxToken> destination, ResolutionContext context)
+        public IEnumerable<SyntaxToken> Convert(CsSchema.Access source, IEnumerable<SyntaxToken> destination, ResolutionContext context)
         {
             switch (source)
             {
-                case CsSchemaAccess.Public:
+                case CsSchema.Access.Public:
                     yield return SyntaxFactory.Token(SyntaxKind.PublicKeyword);
                     break;
-                case CsSchemaAccess.Protected:
+                case CsSchema.Access.Protected:
                     yield return SyntaxFactory.Token(SyntaxKind.ProtectedKeyword);
                     break;
-                case CsSchemaAccess.Internal:
+                case CsSchema.Access.Internal:
                     yield return SyntaxFactory.Token(SyntaxKind.InternalKeyword);
                     break;
-                case CsSchemaAccess.ProtectedInternal:
+                case CsSchema.Access.ProtectedInternal:
                     yield return SyntaxFactory.Token(SyntaxKind.ProtectedKeyword);
                     yield return SyntaxFactory.Token(SyntaxKind.InternalKeyword);
                     break;
-                case CsSchemaAccess.Private:
+                case CsSchema.Access.Private:
                     yield return SyntaxFactory.Token(SyntaxKind.PrivateKeyword);
                     break;
-                case CsSchemaAccess.PrivateProtected:
+                case CsSchema.Access.PrivateProtected:
                     yield return SyntaxFactory.Token(SyntaxKind.PrivateKeyword);
                     yield return SyntaxFactory.Token(SyntaxKind.ProtectedKeyword);
                     break;
@@ -62,7 +65,7 @@ namespace HelpersForCore
         }
     }
 
-    public class CsUnitToSyntaxConverter : ITypeConverter<CsSchemaUnit, CompilationUnitSyntax>
+    public class CsUnitToSyntaxConverter : ITypeConverter<CsSchema.Unit, CompilationUnitSyntax>
     {
         private readonly IMapper mapper;
         public CsUnitToSyntaxConverter(IMapper mapper)
@@ -70,7 +73,7 @@ namespace HelpersForCore
             this.mapper = mapper;
         }
 
-        public CompilationUnitSyntax Convert(CsSchemaUnit source, CompilationUnitSyntax destination, ResolutionContext context)
+        public CompilationUnitSyntax Convert(CsSchema.Unit source, CompilationUnitSyntax destination, ResolutionContext context)
         {
             var syntax = SyntaxFactory.CompilationUnit();
 
@@ -87,14 +90,21 @@ namespace HelpersForCore
             {
                 foreach (var @namespace in source.Namespaces)
                 {
-                    syntax = syntax.AddMembers(mapper.Map<NamespaceDeclarationSyntax>(@namespace));
+                    if (string.IsNullOrWhiteSpace(@namespace.Name) == false)
+                    {
+                        syntax = syntax.AddMembers(mapper.Map<NamespaceDeclarationSyntax>(@namespace));
+                    }
+                    else
+                    {
+                        syntax = syntax.AddMembers(mapper.Map<ClassDeclarationSyntax[]>(@namespace.Classes));
+                    }
                 }
             }
             return syntax;
         }
     }
 
-    public class CsNamespaceToSyntaxConverter : ITypeConverter<CsSchemaNamespace, NamespaceDeclarationSyntax>
+    public class CsNamespaceToSyntaxConverter : ITypeConverter<CsSchema.Namespace, NamespaceDeclarationSyntax>
     {
         private readonly IMapper mapper;
         public CsNamespaceToSyntaxConverter(IMapper mapper)
@@ -102,13 +112,13 @@ namespace HelpersForCore
             this.mapper = mapper;
         }
 
-        public NamespaceDeclarationSyntax Convert(CsSchemaNamespace source, NamespaceDeclarationSyntax destination, ResolutionContext context)
+        public NamespaceDeclarationSyntax Convert(CsSchema.Namespace source, NamespaceDeclarationSyntax destination, ResolutionContext context)
         {
             var syntax = SyntaxFactory.NamespaceDeclaration(
-                SyntaxFactory.ParseName(source.Namespace)).NormalizeWhitespace();
+                SyntaxFactory.ParseName(source.Name)).NormalizeWhitespace();
             if (source.Classes != null)
             {
-                foreach (CsSchemaClass @class in source.Classes)
+                foreach (CsSchema.Class @class in source.Classes)
                 {
                     syntax = syntax.AddMembers(mapper.Map<ClassDeclarationSyntax>(@class));
                 }
@@ -117,7 +127,7 @@ namespace HelpersForCore
         }
     }
 
-    public class CsClassToSyntaxConverter : ITypeConverter<CsSchemaClass, ClassDeclarationSyntax>
+    public class CsClassToSyntaxConverter : ITypeConverter<CsSchema.Class, ClassDeclarationSyntax>
     {
         private readonly IMapper mapper;
         public CsClassToSyntaxConverter(IMapper mapper)
@@ -125,23 +135,77 @@ namespace HelpersForCore
             this.mapper = mapper;
         }
 
-        public ClassDeclarationSyntax Convert(CsSchemaClass source, ClassDeclarationSyntax destination, ResolutionContext context)
+        public ClassDeclarationSyntax Convert(CsSchema.Class source, ClassDeclarationSyntax destination, ResolutionContext context)
         {
             var syntax = SyntaxFactory.ClassDeclaration(source.Name)
                 .AddModifiers(mapper.Map<IEnumerable<SyntaxToken>>(source.Access).ToArray())
-                .NormalizeWhitespace(); ;
+                .NormalizeWhitespace();
+            if (source.InheritTypeNames != null)
+            {
+                foreach (string inherit in source.InheritTypeNames)
+                {
+                    syntax = syntax.AddBaseListTypes(
+                        SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName(inherit)));
+                }
+            }
+            if (source.Attributes != null)
+            {
+                syntax = syntax.AddAttributeLists(
+                    SyntaxFactory.AttributeList(
+                        new SeparatedSyntaxList<AttributeSyntax>().AddRange(
+                            mapper.Map<AttributeSyntax[]>(source.Attributes))));
+            }
+            if (source.Fields != null)
+            {
+                foreach (CsSchema.Field field in source.Fields)
+                {
+                    syntax = syntax.AddMembers(mapper.Map<FieldDeclarationSyntax>(field));
+                }
+            }
             if (source.Properties != null)
             {
-                foreach (CsSchemaProperty property in source.Properties)
+                foreach (CsSchema.Property property in source.Properties)
                 {
                     syntax = syntax.AddMembers(mapper.Map<PropertyDeclarationSyntax>(property));
+                }
+            }
+            if (source.Classes != null)
+            {
+                foreach (CsSchema.Class @class in source.Classes)
+                {
+                    syntax = syntax.AddMembers(mapper.Map<ClassDeclarationSyntax>(@class));
                 }
             }
             return syntax;
         }
     }
 
-    public class CsPropertyToSyntaxConverter : ITypeConverter<CsSchemaProperty, PropertyDeclarationSyntax>
+    public class CsFieldToSyntaxConverter : ITypeConverter<CsSchema.Field, FieldDeclarationSyntax>
+    {
+        private readonly IMapper mapper;
+        public CsFieldToSyntaxConverter(IMapper mapper)
+        {
+            this.mapper = mapper;
+        }
+
+        public FieldDeclarationSyntax Convert(CsSchema.Field source, FieldDeclarationSyntax destination, ResolutionContext context)
+        {
+            var variableDeclaration = SyntaxFactory.VariableDeclaration(SyntaxFactory.ParseTypeName(source.TypeName))
+                .AddVariables(SyntaxFactory.VariableDeclarator(source.Name));
+            var syntax = SyntaxFactory.FieldDeclaration(variableDeclaration)
+                .AddModifiers(mapper.Map<IEnumerable<SyntaxToken>>(source.Access).ToArray());
+            if (source.Attributes != null)
+            {
+                syntax = syntax.AddAttributeLists(
+                    SyntaxFactory.AttributeList(
+                        new SeparatedSyntaxList<AttributeSyntax>().AddRange(
+                            mapper.Map<AttributeSyntax[]>(source.Attributes))));
+            }
+            return syntax;
+        }
+    }
+
+    public class CsPropertyToSyntaxConverter : ITypeConverter<CsSchema.Property, PropertyDeclarationSyntax>
     {
         private readonly IMapper mapper;
         public CsPropertyToSyntaxConverter(IMapper mapper)
@@ -149,19 +213,51 @@ namespace HelpersForCore
             this.mapper = mapper;
         }
 
-        public PropertyDeclarationSyntax Convert(CsSchemaProperty source, PropertyDeclarationSyntax destination, ResolutionContext context)
+        public PropertyDeclarationSyntax Convert(CsSchema.Property source, PropertyDeclarationSyntax destination, ResolutionContext context)
         {
-            return SyntaxFactory.PropertyDeclaration(
+            var syntax = SyntaxFactory.PropertyDeclaration(
                 SyntaxFactory.ParseTypeName(source.TypeName), source.Name)
                     .AddModifiers(mapper.Map<IEnumerable<SyntaxToken>>(source.Access).ToArray())
                     .AddAccessorListAccessors(
                         SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)),
                         SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken)));
+            if (source.Attributes != null)
+            {
+                syntax = syntax.AddAttributeLists(
+                    SyntaxFactory.AttributeList(
+                        new SeparatedSyntaxList<AttributeSyntax>().AddRange(
+                            mapper.Map<AttributeSyntax[]>(source.Attributes))));
+            }
+            return syntax;
+        }
+    }
+
+    public class CsAttributeToSyntaxConverter : ITypeConverter<CsSchema.Attribute, AttributeSyntax>
+    {
+        private readonly IMapper mapper;
+        public CsAttributeToSyntaxConverter(IMapper mapper)
+        {
+            this.mapper = mapper;
+        }
+
+        public AttributeSyntax Convert(CsSchema.Attribute source, AttributeSyntax destination, ResolutionContext context)
+        {
+            var syntax = SyntaxFactory.Attribute(
+                SyntaxFactory.ParseName(source.Name));
+            if (source.ArgumentExpressions != null)
+            {
+                foreach (var expression in source.ArgumentExpressions)
+                {
+                    var argument = SyntaxFactory.AttributeArgument(SyntaxFactory.ParseExpression(expression));
+                    syntax = syntax.AddArgumentListArguments(argument);
+                }
+            }
+            return syntax;
         }
     }
     #endregion
     #region Schema To Schema Converters
-    public class DbTableToCsClassConverter : ITypeConverter<DbSchemaTable, CsSchemaClass>
+    public class DbTableToCsClassConverter : ITypeConverter<DbSchema.Table, CsSchema.Class>
     {
         private readonly IMapper mapper;
         public DbTableToCsClassConverter(IMapper mapper)
@@ -169,30 +265,30 @@ namespace HelpersForCore
             this.mapper = mapper;
         }
 
-        public CsSchemaClass Convert(DbSchemaTable source, CsSchemaClass destination, ResolutionContext context)
+        public CsSchema.Class Convert(DbSchema.Table source, CsSchema.Class destination, ResolutionContext context)
         {
-            CsSchemaClass @class = new CsSchemaClass();
+            CsSchema.Class @class = new CsSchema.Class();
             @class.Name = source.Name.UpperFirst();
-            @class.Properties = mapper.Map<CsSchemaProperty[]>(source.Fields);
+            @class.Properties = mapper.Map<CsSchema.Property[]>(source.Fields);
             return @class;
         }
     }
 
-    public class DbFieldToCsPropertyConverter : ITypeConverter<DbSchemaField, CsSchemaProperty>
+    public class DbFieldToCsPropertyConverter : ITypeConverter<DbSchema.Field, CsSchema.Property>
     {
-        public CsSchemaProperty Convert(DbSchemaField source, CsSchemaProperty destination, ResolutionContext context)
+        public CsSchema.Property Convert(DbSchema.Field source, CsSchema.Property destination, ResolutionContext context)
         {
-            CsSchemaProperty property = new CsSchemaProperty() { Name = source.Name };
+            CsSchema.Property property = new CsSchema.Property() { Name = source.Name };
             #region set attributes
-            List<CsSchemaAttribute> attributes = new List<CsSchemaAttribute>();
+            List<CsSchema.Attribute> attributes = new List<CsSchema.Attribute>();
             if (source.IsIdentity)
             {
-                attributes.Add(new CsSchemaAttribute("Key"));
-                attributes.Add(new CsSchemaAttribute("DatabaseGenerated")
+                attributes.Add(new CsSchema.Attribute("Key"));
+                attributes.Add(new CsSchema.Attribute("DatabaseGenerated")
                 {
-                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    ArgumentExpressions = new string[]
                     {
-                        { "databaseGeneratedOption", new CsSchemaValue("DatabaseGeneratedOption.Identity", false) }
+                        "DatabaseGeneratedOption.Identity"
                     }
                 });
             }
@@ -200,37 +296,34 @@ namespace HelpersForCore
             {
                 if (source.IsNullable == false)
                 {
-                    attributes.Add(new CsSchemaAttribute("Required"));
+                    attributes.Add(new CsSchema.Attribute("Required"));
                 }
-                attributes.Add(new CsSchemaAttribute("Column")
+                attributes.Add(new CsSchema.Attribute("Column")
                 {
-                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    ArgumentExpressions = new string[]
                     {
-                        { "name", new CsSchemaValue(source.Name) }
+                        $"\"{source.Name}\""
                     }
                 });
                 if (source.Length > 0)
                 {
-                    attributes.Add(new CsSchemaAttribute("StringLength")
+                    attributes.Add(new CsSchema.Attribute("StringLength")
                     {
-                        ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                        ArgumentExpressions = new string[]
                         {
-                            { "maximumLength", new CsSchemaValue(source.Length) }
+                            System.Convert.ToString(source.Length)
                         }
                     });
                 }
             }
             else
             {
-                attributes.Add(new CsSchemaAttribute("Column")
+                attributes.Add(new CsSchema.Attribute("Column")
                 {
-                    ConstructorParameters = new Dictionary<string, CsSchemaValue>
+                    ArgumentExpressions = new string[]
                     {
-                        { "name", new CsSchemaValue(source.Name) }
-                    },
-                    Properties = new Dictionary<string, CsSchemaValue>
-                    {
-                        { "TypeName", new CsSchemaValue(source.TypeFullName) }
+                        $"\"{source.Name}\"",
+                        $"TypeName = \"{source.TypeFullName}\""
                     }
                 });
             }
@@ -331,27 +424,27 @@ namespace HelpersForCore
         }
     }
 
-    public class CsClassToTsClassConverter : ITypeConverter<CsSchemaClass, TsSchemaClass>
+    public class CsClassToTsClassConverter : ITypeConverter<CsSchema.Class, TsSchema.Class>
     {
         private readonly IMapper mapper;
         public CsClassToTsClassConverter(IMapper mapper)
         {
             this.mapper = mapper;
         }
-        public TsSchemaClass Convert(CsSchemaClass source, TsSchemaClass destination, ResolutionContext context)
+        public TsSchema.Class Convert(CsSchema.Class source, TsSchema.Class destination, ResolutionContext context)
         {
-            TsSchemaClass @class = new TsSchemaClass();
+            TsSchema.Class @class = new TsSchema.Class();
             @class.Name = source.Name;
-            @class.Properties = mapper.Map<TsSchemaProperty[]>(source.Properties);
+            @class.Properties = mapper.Map<TsSchema.Property[]>(source.Properties);
             return @class;
         }
     }
 
-    public class CsPropertyToTsPropertyConverter : ITypeConverter<CsSchemaProperty, TsSchemaProperty>
+    public class CsPropertyToTsPropertyConverter : ITypeConverter<CsSchema.Property, TsSchema.Property>
     {
-        public TsSchemaProperty Convert(CsSchemaProperty source, TsSchemaProperty destination, ResolutionContext context)
+        public TsSchema.Property Convert(CsSchema.Property source, TsSchema.Property destination, ResolutionContext context)
         {
-            TsSchemaProperty property = new TsSchemaProperty();
+            TsSchema.Property property = new TsSchema.Property();
             #region convert type
             property.Name = source.Name.LowerFirst();
             switch (source.TypeName)
